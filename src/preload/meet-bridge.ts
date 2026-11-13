@@ -100,33 +100,16 @@ function observePage(): void {
   reportChanges();
 }
 
-/**
- * Presses one of Meet's keyboard shortcuts, which all hold Cmd, and Ctrl too when `control` is set.
- */
-function pressMeetShortcut(key: string, { control = false } = {}): void {
-  // Meet reads the legacy `keyCode`, which the event constructor takes although the DOM typings omit it.
-  const shortcut: KeyboardEventInit & { keyCode: number } = {
-    key,
-    code: `Key${key.toUpperCase()}`,
-    keyCode: key.toUpperCase().charCodeAt(0),
-    metaKey: true,
-    ctrlKey: control,
-    bubbles: true,
-    cancelable: true,
-  };
-
-  document.dispatchEvent(new KeyboardEvent("keydown", shortcut));
-}
-
-const ACTIONS: Record<BridgeAction, () => void> = {
-  "toggle-mute": () => pressMeetShortcut("d"),
-  "toggle-camera": () => pressMeetShortcut("e"),
-  "toggle-hand": () => pressMeetShortcut("h", { control: true }),
-
-  // Meet has no shortcut for leaving.
-  "leave-call": () => document.querySelector<HTMLElement>(LEAVE_CALL_CONTROL)?.click(),
+// Meet ignores its own keyboard shortcuts while another app is focused, so every action clicks.
+const ACTION_CONTROLS: Record<BridgeAction, string> = {
+  "toggle-mute": MICROPHONE_CONTROL,
+  "toggle-camera": CAMERA_CONTROL,
+  "toggle-hand": HAND_CONTROL,
+  "leave-call": LEAVE_CALL_CONTROL,
 };
 
-ipcRenderer.on(ACTION_CHANNEL, (_event, action: BridgeAction) => ACTIONS[action]());
+ipcRenderer.on(ACTION_CHANNEL, (_event, action: BridgeAction) => {
+  document.querySelector<HTMLElement>(ACTION_CONTROLS[action])?.click();
+});
 
 window.addEventListener("DOMContentLoaded", observePage);

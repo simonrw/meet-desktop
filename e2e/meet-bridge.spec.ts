@@ -87,7 +87,7 @@ test("muting with Meet's own button is reflected in the Meeting State", async ()
   await expect.poll(meetingState).toEqual(inCall());
 });
 
-test("the toggle mute Command presses Meet's mute shortcut, even with the Meeting Window hidden", async () => {
+test("the toggle mute Command toggles Meet's microphone, even with the Meeting Window hidden", async () => {
   await joinCall();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.hide());
 
@@ -126,7 +126,7 @@ test("the hand raised and lowered inside Meet is reflected in the Meeting State"
   await expect.poll(meetingState).toEqual(inCall({ handRaised: false }));
 });
 
-test("the toggle camera Command presses Meet's camera shortcut", async () => {
+test("the toggle camera Command toggles Meet's camera", async () => {
   await joinCall();
 
   await send("toggle-camera");
@@ -135,7 +135,7 @@ test("the toggle camera Command presses Meet's camera shortcut", async () => {
   await expect.poll(meetingState).toEqual(inCall({ cameraOn: true }));
 });
 
-test("the toggle hand Command presses Meet's hand shortcut", async () => {
+test("the toggle hand Command raises and lowers the hand in Meet", async () => {
   await joinCall();
 
   await send("toggle-hand");

@@ -21,7 +21,7 @@ A user intent from a hotkey, the menu bar or the UI, for example "toggle mute", 
 _Avoid_: Action, shortcut
 
 **Meet Bridge**:
-The part of the app that lives in the Meet page: it turns what it sees there into Meet Signals and carries out Bridge actions (such as pressing Meet's mute shortcut) on request.
+The part of the app that lives in the Meet page: it turns what it sees there into Meet Signals and carries out Bridge actions (such as clicking Meet's microphone button) on request.
 _Avoid_: Content script, injector
 
 **Source Picker**:

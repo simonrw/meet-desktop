@@ -1,6 +1,6 @@
 # Release smoke checklist
 
-The end-to-end tests run against a stub Meet page, so they can't catch changes to the real Meet DOM or its keyboard shortcuts. Run this checklist against real Google Meet before each release, using a packaged build (`npm run package`) and a Google account whose language is English.
+The end-to-end tests run against a stub Meet page, so they can't catch changes to the real Meet DOM. Run this checklist against real Google Meet before each release, using a packaged build (`npm run package`) and a Google account whose language is English.
 
 If a step fails, the Meet hooks in `src/preload/meet-bridge.ts` are the first place to look. For screen sharing, look at `src/main/screen-share.ts`.
 

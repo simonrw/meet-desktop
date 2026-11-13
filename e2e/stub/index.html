@@ -6,12 +6,11 @@
   </head>
   <body>
     <!--
-      Reproduces the Meet DOM hooks and keyboard shortcuts the Meet Bridge relies on:
+      Reproduces the Meet DOM hooks the Meet Bridge relies on:
       - the microphone control, with `data-is-muted` and an aria-label naming the microphone (lobby and call)
       - the camera control, with `data-is-muted` and an aria-label naming the camera (lobby and call)
       - the hand control, with `aria-pressed` and an aria-label naming the hand (call only)
       - the "Leave call" control (call only)
-      - Cmd+D toggling the microphone, Cmd+E the camera and Ctrl+Cmd+H the hand
 
       The "Share screen" control (call only) asks for display media as Meet does, and `#share-status` shows the outcome.
     -->
@@ -116,20 +115,6 @@
       };
 
       document.addEventListener("click", (event) => clicks[event.target.id]?.());
-
-      const shortcuts = {
-        68: { ctrlKey: false, press: toggleMicrophone },
-        69: { ctrlKey: false, press: toggleCamera },
-        72: { ctrlKey: true, press: toggleHand },
-      };
-
-      document.addEventListener("keydown", (event) => {
-        const shortcut = shortcuts[event.keyCode];
-
-        if (shortcut && event.metaKey && event.ctrlKey === shortcut.ctrlKey) {
-          shortcut.press();
-        }
-      });
 
       show("home");
     </script>
