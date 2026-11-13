@@ -1,0 +1,37 @@
+import { mkdtempSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { _electron as electron, type ElectronApplication } from "@playwright/test";
+
+/**
+ * Serves the stub Meet page on a random local port and returns its origin.
+ */
+export async function startStubMeet(): Promise<{ origin: string; close: () => void }> {
+  const page = readFileSync(join(__dirname, "stub", "index.html"));
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html" });
+    response.end(page);
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+
+  return { origin: `http://127.0.0.1:${port}`, close: () => server.close() };
+}
+
+/**
+ * Launches the built app against the given Meet origin, with a throwaway user data directory.
+ */
+export async function launchApp(meetOrigin: string): Promise<ElectronApplication> {
+  return electron.launch({
+    args: ["."],
+    env: {
+      ...process.env,
+      MEET_DESKTOP_MEET_ORIGIN: meetOrigin,
+      MEET_DESKTOP_USER_DATA: mkdtempSync(join(tmpdir(), "meet-desktop-e2e-")),
+    },
+  });
+}

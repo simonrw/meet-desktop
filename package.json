@@ -1,0 +1,43 @@
+{
+  "name": "meet-desktop",
+  "productName": "Meet",
+  "version": "0.1.0",
+  "description": "Google Meet in its own macOS window",
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "start": "npm run build && electron .",
+    "test": "vitest run",
+    "test:e2e": "npm run build && playwright test",
+    "package": "npm run build && electron-builder --mac --dir"
+  },
+  "build": {
+    "appId": "dev.simonrw.meet-desktop",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.business",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Meet uses your camera for video calls.",
+        "NSMicrophoneUsageDescription": "Meet uses your microphone for video calls."
+      },
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^24.19.2",
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
+  }
+}
