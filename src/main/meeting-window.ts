@@ -13,6 +13,7 @@ import {
 
 import { MEET_BRIDGE_PRELOAD } from "./meet-bridge";
 import { isInAppUrl, isMeetUrl } from "./navigation-policy";
+import { shareScreenOnRequest } from "./screen-share";
 import { loadBounds, saveBounds } from "./window-bounds";
 
 // Persistent so the Google login survives relaunches, and dedicated so it never mixes with a browser profile.
@@ -20,7 +21,14 @@ const PARTITION = "persist:meet";
 
 const DEFAULT_SIZE = { width: 1280, height: 800 };
 
-const MEET_PERMISSIONS = new Set(["media", "notifications", "fullscreen", "clipboard-sanitized-write", "clipboard-read"]);
+const MEET_PERMISSIONS = new Set([
+  "media",
+  "display-capture",
+  "notifications",
+  "fullscreen",
+  "clipboard-sanitized-write",
+  "clipboard-read",
+]);
 
 export interface MeetingWindow {
   readonly webContents: WebContents;
@@ -63,9 +71,16 @@ function configureSession(meetSession: Session, meetOrigin: string): void {
     return isAllowed(permission, requestingOrigin);
   });
 
-  meetSession.setPermissionRequestHandler(async (_contents, permission, callback, details) => {
+  const chooseScreenShare = shareScreenOnRequest(meetSession);
+
+  meetSession.setPermissionRequestHandler(async (contents, permission, callback, details) => {
     if (!isAllowed(permission, details.requestingUrl)) {
       callback(false);
+      return;
+    }
+
+    if (permission === "display-capture") {
+      callback(await chooseScreenShare(contents));
       return;
     }
 

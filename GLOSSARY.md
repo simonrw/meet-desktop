@@ -24,6 +24,10 @@ _Avoid_: Action, shortcut
 The part of the app that lives in the Meet page: it turns what it sees there into Meet Signals and carries out Bridge actions (such as pressing Meet's mute shortcut) on request.
 _Avoid_: Content script, injector
 
+**Source Picker**:
+The app's own dialog listing the screens and windows that can be shared, shown when Meet asks to share the screen.
+_Avoid_: Screen picker, share dialog
+
 **Integration**:
 A system side effect tied to being in a call, with an apply step and a restore step. The first two are the Focus Integration and the Slack Integration.
 _Avoid_: Plugin, hook

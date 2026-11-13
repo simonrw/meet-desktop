@@ -11,8 +11,11 @@
       - the camera control, which also carries `data-is-muted`
       - the "Leave call" control (call only)
       - Cmd+D toggling the microphone
+
+      The "Share screen" control (call only) asks for display media as Meet does, and `#share-status` shows the outcome.
     -->
     <main id="screen"></main>
+    <p id="share-status">not sharing</p>
 
     <script>
       const screen = document.getElementById("screen");
@@ -28,7 +31,12 @@
       const screens = {
         home: () => `<h1>Stub Meet home</h1><button id="new-meeting">New meeting</button>`,
         lobby: () => `<h1>Ready to join?</h1>${mediaControls()}<button id="join">Join now</button>`,
-        call: () => `<h1>In call</h1>${mediaControls()}<button id="leave" aria-label="Leave call">Leave</button>`,
+        call: () => `
+          <h1>In call</h1>
+          ${mediaControls()}
+          <button id="share" aria-label="Share screen">Share</button>
+          <button id="leave" aria-label="Leave call">Leave</button>
+        `,
         left: () => `<h1>You left the meeting</h1><button id="rejoin">Rejoin</button>`,
       };
 
@@ -48,12 +56,26 @@
         show(current);
       }
 
+      const shareStatus = document.getElementById("share-status");
+
+      async function shareScreen() {
+        try {
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+
+          shareStatus.textContent = `sharing ${stream.getVideoTracks()[0].getSettings().displaySurface}`;
+        } catch (error) {
+          // Meet treats a refused request as a cancelled share and shows nothing.
+          shareStatus.textContent = error.name === "NotAllowedError" ? "share cancelled" : `share failed: ${error.name}`;
+        }
+      }
+
       const clicks = {
         "new-meeting": () => show("lobby"),
         join: () => show("call"),
         leave: () => show("left"),
         rejoin: () => show("call"),
         microphone: toggleMicrophone,
+        share: shareScreen,
       };
 
       document.addEventListener("click", (event) => clicks[event.target.id]?.());
