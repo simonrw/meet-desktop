@@ -4,6 +4,10 @@ import type { Command } from "./meeting-controller";
 
 const BINDINGS: Array<{ accelerator: string; command: Command }> = [
   { accelerator: "Control+Alt+M", command: { type: "toggle-mute" } },
+  { accelerator: "Control+Alt+C", command: { type: "toggle-camera" } },
+  { accelerator: "Control+Alt+H", command: { type: "toggle-hand" } },
+  { accelerator: "Control+Alt+S", command: { type: "show-window" } },
+  { accelerator: "Control+Alt+L", command: { type: "leave-call" } },
 ];
 
 /**

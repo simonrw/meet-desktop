@@ -9,15 +9,15 @@ The app window hosting Meet. It has two presentations: **Full** and **Mini Mode*
 _Avoid_: Main window, browser window, PiP
 
 **Meeting State**:
-Where the user is in Meet: `idle` (Meet home or nothing loaded), `lobby` (Meet's pre-join screen) or `in-call`. Mute is attached while `in-call`.
+Where the user is in Meet: `idle` (Meet home or nothing loaded), `lobby` (Meet's pre-join screen) or `in-call`. Mute, camera and raised-hand states are attached while `in-call`.
 _Avoid_: Call state, call status
 
 **Meet Signal**:
-An observation from the Meet page, for example "entered lobby", "entered call", "left call" or "mute changed". "Left call" covers any return to a page with no meeting on it, including backing out of the lobby.
+An observation from the Meet page, for example "entered lobby", "entered call", "left call", "mute changed", "camera changed" or "hand changed". "Left call" covers any return to a page with no meeting on it, including backing out of the lobby.
 _Avoid_: Event, page event
 
 **Command**:
-A user intent from a hotkey, the menu bar or the UI, for example "toggle mute". Call-only Commands do nothing outside `in-call`.
+A user intent from a hotkey, the menu bar or the UI, for example "toggle mute", "leave call", "show window" or "close window". Call-only Commands (mute, camera, hand, leave) do nothing outside `in-call`. The leave call Command, and the close window Command during a call, leave only once the user confirms.
 _Avoid_: Action, shortcut
 
 **Meet Bridge**:

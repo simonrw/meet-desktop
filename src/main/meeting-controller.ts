@@ -1,15 +1,35 @@
-export type MeetingState = { status: "idle" } | { status: "lobby" } | { status: "in-call"; muted: boolean };
+export type MeetingState =
+  | { status: "idle" }
+  | { status: "lobby" }
+  | { status: "in-call"; muted: boolean; cameraOn: boolean; handRaised: boolean };
 
 export type MeetSignal =
   | { type: "entered-lobby" }
   | { type: "entered-call" }
   | { type: "left-call" }
-  | { type: "mute-changed"; muted: boolean };
+  | { type: "mute-changed"; muted: boolean }
+  | { type: "camera-changed"; cameraOn: boolean }
+  | { type: "hand-changed"; handRaised: boolean };
 
-export type Command = { type: "toggle-mute" };
+export type Command = {
+  type: "toggle-mute" | "toggle-camera" | "toggle-hand" | "leave-call" | "show-window" | "close-window";
+};
 
 export interface MeetBridgePort {
   toggleMute(): void;
+  toggleCamera(): void;
+  toggleHand(): void;
+  leaveCall(): void;
+}
+
+export interface MeetingWindowPort {
+  show(): void;
+  hide(): void;
+
+  /**
+   * Asks the user whether to leave the call, resolving to true if they agree.
+   */
+  confirmLeave(): Promise<boolean>;
 }
 
 export interface MeetingController {
@@ -20,15 +40,51 @@ export interface MeetingController {
 
 /**
  * Creates the Meeting Controller, which owns the Meeting State: it takes in Meet Signals and Commands, and acts on
- * the Meet page through the Meet Bridge port.
+ * the Meet page and the Meeting Window through their ports.
  */
-export function createMeetingController({ meetBridge }: { meetBridge: MeetBridgePort }): MeetingController {
+export function createMeetingController({
+  meetBridge,
+  meetingWindow,
+}: {
+  meetBridge: MeetBridgePort;
+  meetingWindow: MeetingWindowPort;
+}): MeetingController {
   let status: MeetingState["status"] = "idle";
   let muted = false;
+  let cameraOn = true;
+  let handRaised = false;
+  let confirmingLeave = false;
+
+  /**
+   * Leaves the call if the user agrees to, resolving to whether they agreed.
+   */
+  async function leaveOnceConfirmed(): Promise<boolean> {
+    if (confirmingLeave) {
+      return false;
+    }
+
+    confirmingLeave = true;
+    const confirmed = await meetingWindow.confirmLeave().finally(() => {
+      confirmingLeave = false;
+    });
+
+    // The call may have ended while the question was on screen.
+    if (confirmed && status === "in-call") {
+      meetBridge.leaveCall();
+    }
+
+    return confirmed;
+  }
+
+  async function closeWindow(): Promise<void> {
+    if (status !== "in-call" || (await leaveOnceConfirmed())) {
+      meetingWindow.hide();
+    }
+  }
 
   return {
     get state() {
-      return status === "in-call" ? { status, muted } : { status };
+      return status === "in-call" ? { status, muted, cameraOn, handRaised } : { status };
     },
 
     signal(signal) {
@@ -44,15 +100,35 @@ export function createMeetingController({ meetBridge }: { meetBridge: MeetBridge
         case "left-call":
           status = "idle";
           muted = false;
+          cameraOn = true;
+          handRaised = false;
           break;
 
         case "mute-changed":
           muted = signal.muted;
           break;
+
+        case "camera-changed":
+          cameraOn = signal.cameraOn;
+          break;
+
+        case "hand-changed":
+          handRaised = signal.handRaised;
+          break;
       }
     },
 
     command(command) {
+      switch (command.type) {
+        case "show-window":
+          meetingWindow.show();
+          return;
+
+        case "close-window":
+          void closeWindow();
+          return;
+      }
+
       if (status !== "in-call") {
         return;
       }
@@ -60,6 +136,18 @@ export function createMeetingController({ meetBridge }: { meetBridge: MeetBridge
       switch (command.type) {
         case "toggle-mute":
           meetBridge.toggleMute();
+          break;
+
+        case "toggle-camera":
+          meetBridge.toggleCamera();
+          break;
+
+        case "toggle-hand":
+          meetBridge.toggleHand();
+          break;
+
+        case "leave-call":
+          void leaveOnceConfirmed();
           break;
       }
     },

@@ -6,7 +6,7 @@ import type { MeetBridgePort, MeetSignal } from "./meeting-controller";
 
 export type SignalChannel = "meet-bridge:signal";
 export type ActionChannel = "meet-bridge:action";
-export type BridgeAction = "toggle-mute";
+export type BridgeAction = "toggle-mute" | "toggle-camera" | "toggle-hand" | "leave-call";
 
 const SIGNAL_CHANNEL: SignalChannel = "meet-bridge:signal";
 const ACTION_CHANNEL: ActionChannel = "meet-bridge:action";
@@ -34,5 +34,8 @@ export function connectMeetBridge(meetPage: WebContents, onSignal: (signal: Meet
 
   return {
     toggleMute: () => act("toggle-mute"),
+    toggleCamera: () => act("toggle-camera"),
+    toggleHand: () => act("toggle-hand"),
+    leaveCall: () => act("leave-call"),
   };
 }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   app,
   BrowserWindow,
+  dialog,
   screen,
   session,
   shell,
@@ -12,6 +13,7 @@ import {
 } from "electron";
 
 import { MEET_BRIDGE_PRELOAD } from "./meet-bridge";
+import type { MeetingWindowPort } from "./meeting-controller";
 import { isInAppUrl, isMeetUrl } from "./navigation-policy";
 import { shareScreenOnRequest } from "./screen-share";
 import { loadBounds, saveBounds } from "./window-bounds";
@@ -30,16 +32,15 @@ const MEET_PERMISSIONS = new Set([
   "clipboard-read",
 ]);
 
-export interface MeetingWindow {
+export interface MeetingWindow extends MeetingWindowPort {
   readonly webContents: WebContents;
-  show(): void;
 }
 
 /**
- * Opens the Meeting Window: Meet hosted in a dedicated persistent session, which hides on close and remembers
- * its bounds.
+ * Opens the Meeting Window: Meet hosted in a dedicated persistent session, which remembers its bounds. Closing the
+ * window calls `onCloseRequested` in place of closing it, until the app quits.
  */
-export function createMeetingWindow(meetOrigin: string): MeetingWindow {
+export function createMeetingWindow(meetOrigin: string, onCloseRequested: () => void): MeetingWindow {
   const meetSession = session.fromPartition(PARTITION);
   configureSession(meetSession, meetOrigin);
 
@@ -54,13 +55,39 @@ export function createMeetingWindow(meetOrigin: string): MeetingWindow {
 
   routeNavigation(window, meetOrigin);
   rememberBounds(window, boundsFile);
-  hideOnClose(window);
+  interceptClose(window, onCloseRequested);
 
   window.loadURL(meetOrigin);
 
+  const show = () => {
+    if (window.isMinimized()) {
+      window.restore();
+    }
+
+    window.show();
+  };
+
   return {
     webContents: window.webContents,
-    show: () => window.show(),
+    show,
+    hide: () => hide(window),
+
+    async confirmLeave() {
+      // The question is a sheet on the window, which may be hidden or behind another app.
+      show();
+
+      const { response } = await dialog.showMessageBox(window, {
+        type: "question",
+        message: "Leave the call?",
+        buttons: ["Leave", "Cancel"],
+
+        // Return must not hang up: the question can appear while the user is typing in another app.
+        defaultId: 1,
+        cancelId: 1,
+      });
+
+      return response === 0;
+    },
   };
 }
 
@@ -143,7 +170,7 @@ function rememberBounds(window: BrowserWindow, boundsFile: string): void {
   window.on("close", save);
 }
 
-function hideOnClose(window: BrowserWindow): void {
+function interceptClose(window: BrowserWindow, onCloseRequested: () => void): void {
   let quitting = false;
   app.on("before-quit", () => {
     quitting = true;
@@ -155,13 +182,16 @@ function hideOnClose(window: BrowserWindow): void {
     }
 
     event.preventDefault();
-
-    // Hiding a full-screen window leaves an empty black Space behind.
-    if (window.isFullScreen()) {
-      window.once("leave-full-screen", () => window.hide());
-      window.setFullScreen(false);
-    } else {
-      window.hide();
-    }
+    onCloseRequested();
   });
+}
+
+function hide(window: BrowserWindow): void {
+  // Hiding a full-screen window leaves an empty black Space behind.
+  if (window.isFullScreen()) {
+    window.once("leave-full-screen", () => window.hide());
+    window.setFullScreen(false);
+  } else {
+    window.hide();
+  }
 }

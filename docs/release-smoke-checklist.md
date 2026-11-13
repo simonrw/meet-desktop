@@ -19,6 +19,16 @@ The default mute hotkey is Control+Option+M.
 - [ ] Click in Meet's chat box, type a few characters, then press the hotkey: the microphone toggles and nothing extra is typed.
 - [ ] Mute with Meet's own microphone button, then press the hotkey: it unmutes (the app followed the change made inside Meet).
 
+## Camera, hand and show window by hotkey
+
+The defaults are Control+Option+C (camera), Control+Option+H (hand) and Control+Option+S (show window).
+
+- [ ] Focus another app and press the camera hotkey: the camera toggles in Meet. Press it again: it toggles back.
+- [ ] Focus another app and press the hand hotkey: your hand is raised in Meet. Press it again: it is lowered.
+- [ ] Raise your hand with Meet's own button, then press the hand hotkey: it lowers (the app followed the change made inside Meet).
+- [ ] Click in Meet's chat box, type a few characters, then press the camera and hand hotkeys: both toggle and nothing extra is typed.
+- [ ] Focus another app and press the show-window hotkey: the Meeting Window comes to the front. It also does so when the window is hidden or minimised, and outside a call.
+
 ## Screen sharing
 
 Join from a second device or browser profile to see what other participants see.
@@ -31,6 +41,12 @@ Join from a second device or browser profile to see what other participants see.
 
 ## Leave
 
+The default leave hotkey is Control+Option+L.
+
+- [ ] In the lobby, press the camera, hand and leave hotkeys: nothing happens.
+- [ ] In a call, focus another app and press the leave hotkey: the Meeting Window comes forward asking "Leave the call?". Cancel: the call carries on. Press it again and choose Leave: Meet shows "You left the meeting".
+- [ ] Rejoin and close the Meeting Window: the same question appears. Cancel: the window stays and the call carries on. Close again and choose Leave: the call ends and the window hides.
+- [ ] Outside a call, close the Meeting Window: it hides without asking.
 - [ ] Leave the call with Meet's leave button. On the "You left the meeting" screen, the mute hotkey does nothing.
 - [ ] Rejoin from that screen: the mute hotkey works again.
 - [ ] Return to the Meet home screen: the mute hotkey does nothing.

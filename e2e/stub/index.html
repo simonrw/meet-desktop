@@ -8,9 +8,10 @@
     <!--
       Reproduces the Meet DOM hooks and keyboard shortcuts the Meet Bridge relies on:
       - the microphone control, with `data-is-muted` and an aria-label naming the microphone (lobby and call)
-      - the camera control, which also carries `data-is-muted`
+      - the camera control, with `data-is-muted` and an aria-label naming the camera (lobby and call)
+      - the hand control, with `aria-pressed` and an aria-label naming the hand (call only)
       - the "Leave call" control (call only)
-      - Cmd+D toggling the microphone
+      - Cmd+D toggling the microphone, Cmd+E the camera and Ctrl+Cmd+H the hand
 
       The "Share screen" control (call only) asks for display media as Meet does, and `#share-status` shows the outcome.
     -->
@@ -20,9 +21,13 @@
     <script>
       const screen = document.getElementById("screen");
       let muted = false;
+      let cameraOff = true;
+      let handRaised = false;
 
       const mediaControls = () => `
-        <button id="camera" data-is-muted="true" aria-label="Turn on camera">Camera</button>
+        <button id="camera" data-is-muted="${cameraOff}" aria-label="Turn ${cameraOff ? "on" : "off"} camera">
+          Camera
+        </button>
         <button id="microphone" data-is-muted="${muted}" aria-label="Turn ${muted ? "on" : "off"} microphone">
           Microphone
         </button>
@@ -34,6 +39,13 @@
         call: () => `
           <h1>In call</h1>
           ${mediaControls()}
+          <button
+            id="hand"
+            aria-pressed="${handRaised}"
+            aria-label="${handRaised ? "Lower hand" : "Raise hand"} (ctrl + ⌘ + h)"
+          >
+            Hand
+          </button>
           <button id="share" aria-label="Share screen">Share</button>
           <button id="leave" aria-label="Leave call">Leave</button>
         `,
@@ -56,6 +68,29 @@
         show(current);
       }
 
+      function toggleCamera() {
+        if (current !== "lobby" && current !== "call") {
+          return;
+        }
+
+        cameraOff = !cameraOff;
+        show(current);
+      }
+
+      function toggleHand() {
+        if (current !== "call") {
+          return;
+        }
+
+        handRaised = !handRaised;
+        show(current);
+      }
+
+      function leaveCall() {
+        handRaised = false;
+        show("left");
+      }
+
       const shareStatus = document.getElementById("share-status");
 
       async function shareScreen() {
@@ -72,17 +107,27 @@
       const clicks = {
         "new-meeting": () => show("lobby"),
         join: () => show("call"),
-        leave: () => show("left"),
+        leave: leaveCall,
         rejoin: () => show("call"),
         microphone: toggleMicrophone,
+        camera: toggleCamera,
+        hand: toggleHand,
         share: shareScreen,
       };
 
       document.addEventListener("click", (event) => clicks[event.target.id]?.());
 
+      const shortcuts = {
+        68: { ctrlKey: false, press: toggleMicrophone },
+        69: { ctrlKey: false, press: toggleCamera },
+        72: { ctrlKey: true, press: toggleHand },
+      };
+
       document.addEventListener("keydown", (event) => {
-        if (event.metaKey && event.keyCode === 68) {
-          toggleMicrophone();
+        const shortcut = shortcuts[event.keyCode];
+
+        if (shortcut && event.metaKey && event.ctrlKey === shortcut.ctrlKey) {
+          shortcut.press();
         }
       });
 

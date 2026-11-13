@@ -28,10 +28,12 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.whenReady().then(() => {
-    const meetingWindow = createMeetingWindow(unpackagedOverride("MEET_DESKTOP_MEET_ORIGIN") ?? MEET_ORIGIN);
+    const meetingWindow = createMeetingWindow(unpackagedOverride("MEET_DESKTOP_MEET_ORIGIN") ?? MEET_ORIGIN, () =>
+      meetingController.command({ type: "close-window" }),
+    );
 
     const meetBridge = connectMeetBridge(meetingWindow.webContents, (signal) => meetingController.signal(signal));
-    const meetingController = createMeetingController({ meetBridge });
+    const meetingController = createMeetingController({ meetBridge, meetingWindow });
 
     registerHotkeys((command) => meetingController.command(command));
 
