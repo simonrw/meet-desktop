@@ -50,3 +50,12 @@ The default leave hotkey is Control+Option+L.
 - [ ] Leave the call with Meet's leave button. On the "You left the meeting" screen, the mute hotkey does nothing.
 - [ ] Rejoin from that screen: the mute hotkey works again.
 - [ ] Return to the Meet home screen: the mute hotkey does nothing.
+
+## Settings
+
+- [ ] Press Cmd+, in the app: the settings window opens, listing each hotkey's combination.
+- [ ] Record a new combination for Mute, focus another app and press it: the microphone toggles in a call. The old combination does nothing.
+- [ ] Turn off the camera hotkey: pressing its old combination in another app does nothing in Meet, and reaches that app instead.
+- [ ] Record a combination another app already uses as a global shortcut (for example, one set up in Raycast or Alfred): the settings window says Mute couldn't use it. Record a different one: the message goes.
+- [ ] Quit and relaunch: the changed and turned-off hotkeys are as you left them.
+- [ ] Turn on "Launch at login": Meet appears under System Settings > General > Login Items. Turn it off: it disappears.

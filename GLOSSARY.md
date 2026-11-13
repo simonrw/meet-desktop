@@ -20,6 +20,10 @@ _Avoid_: Event, page event
 A user intent from a hotkey, the menu bar or the UI, for example "toggle mute", "leave call", "show window" or "close window". Call-only Commands (mute, camera, hand, leave) do nothing outside `in-call`. The leave call Command, and the close window Command during a call, leave only once the user confirms.
 _Avoid_: Action, shortcut
 
+**Hotkey**:
+A system-wide key combination that sends a Command whichever app is focused. The user can record a different combination for each hotkey, or turn it off.
+_Avoid_: Shortcut, keybinding
+
 **Meet Bridge**:
 The part of the app that lives in the Meet page: it turns what it sees there into Meet Signals and carries out Bridge actions (such as clicking Meet's microphone button) on request.
 _Avoid_: Content script, injector

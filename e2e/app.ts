@@ -23,15 +23,22 @@ export async function startStubMeet(): Promise<{ origin: string; close: () => vo
 }
 
 /**
- * Launches the built app against the given Meet origin, with a throwaway user data directory.
+ * Creates a throwaway user data directory for the app.
  */
-export async function launchApp(meetOrigin: string): Promise<ElectronApplication> {
+export function newUserData(): string {
+  return mkdtempSync(join(tmpdir(), "meet-desktop-e2e-"));
+}
+
+/**
+ * Launches the built app against the given Meet origin, with a throwaway user data directory unless given one.
+ */
+export async function launchApp(meetOrigin: string, userData = newUserData()): Promise<ElectronApplication> {
   return electron.launch({
     args: ["."],
     env: {
       ...process.env,
       MEET_DESKTOP_MEET_ORIGIN: meetOrigin,
-      MEET_DESKTOP_USER_DATA: mkdtempSync(join(tmpdir(), "meet-desktop-e2e-")),
+      MEET_DESKTOP_USER_DATA: userData,
     },
   });
 }

@@ -1,9 +1,10 @@
 import { app } from "electron";
 
-import { registerHotkeys } from "./hotkeys";
+import { setAppMenu } from "./app-menu";
 import { connectMeetBridge } from "./meet-bridge";
 import { createMeetingController, type MeetingController } from "./meeting-controller";
 import { createMeetingWindow } from "./meeting-window";
+import { startSettings } from "./settings";
 
 declare global {
   // Lets end-to-end tests read the Meeting State and send Commands. Set in unpackaged builds only.
@@ -35,7 +36,8 @@ if (!app.requestSingleInstanceLock()) {
     const meetBridge = connectMeetBridge(meetingWindow.webContents, (signal) => meetingController.signal(signal));
     const meetingController = createMeetingController({ meetBridge, meetingWindow });
 
-    registerHotkeys((command) => meetingController.command(command));
+    const settingsWindow = startSettings((command) => meetingController.command(command));
+    setAppMenu(() => settingsWindow.open());
 
     if (!app.isPackaged) {
       globalThis.meetingController = meetingController;
