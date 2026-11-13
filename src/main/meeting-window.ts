@@ -1,7 +1,17 @@
 import { join } from "node:path";
 
-import { app, BrowserWindow, screen, session, shell, systemPreferences, type Session } from "electron";
+import {
+  app,
+  BrowserWindow,
+  screen,
+  session,
+  shell,
+  systemPreferences,
+  type Session,
+  type WebContents,
+} from "electron";
 
+import { MEET_BRIDGE_PRELOAD } from "./meet-bridge";
 import { isInAppUrl, isMeetUrl } from "./navigation-policy";
 import { loadBounds, saveBounds } from "./window-bounds";
 
@@ -13,6 +23,7 @@ const DEFAULT_SIZE = { width: 1280, height: 800 };
 const MEET_PERMISSIONS = new Set(["media", "notifications", "fullscreen", "clipboard-sanitized-write", "clipboard-read"]);
 
 export interface MeetingWindow {
+  readonly webContents: WebContents;
   show(): void;
 }
 
@@ -30,7 +41,7 @@ export function createMeetingWindow(meetOrigin: string): MeetingWindow {
   const window = new BrowserWindow({
     ...(loadBounds(boundsFile, workAreas) ?? DEFAULT_SIZE),
     title: "Meet",
-    webPreferences: { session: meetSession, sandbox: true, contextIsolation: true },
+    webPreferences: { session: meetSession, sandbox: true, contextIsolation: true, preload: MEET_BRIDGE_PRELOAD },
   });
 
   routeNavigation(window, meetOrigin);
@@ -40,6 +51,7 @@ export function createMeetingWindow(meetOrigin: string): MeetingWindow {
   window.loadURL(meetOrigin);
 
   return {
+    webContents: window.webContents,
     show: () => window.show(),
   };
 }

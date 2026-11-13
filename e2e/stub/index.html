@@ -5,6 +5,66 @@
     <title>Stub Meet</title>
   </head>
   <body>
-    <h1>Stub Meet home</h1>
+    <!--
+      Reproduces the Meet DOM hooks and keyboard shortcuts the Meet Bridge relies on:
+      - the microphone control, with `data-is-muted` and an aria-label naming the microphone (lobby and call)
+      - the camera control, which also carries `data-is-muted`
+      - the "Leave call" control (call only)
+      - Cmd+D toggling the microphone
+    -->
+    <main id="screen"></main>
+
+    <script>
+      const screen = document.getElementById("screen");
+      let muted = false;
+
+      const mediaControls = () => `
+        <button id="camera" data-is-muted="true" aria-label="Turn on camera">Camera</button>
+        <button id="microphone" data-is-muted="${muted}" aria-label="Turn ${muted ? "on" : "off"} microphone">
+          Microphone
+        </button>
+      `;
+
+      const screens = {
+        home: () => `<h1>Stub Meet home</h1><button id="new-meeting">New meeting</button>`,
+        lobby: () => `<h1>Ready to join?</h1>${mediaControls()}<button id="join">Join now</button>`,
+        call: () => `<h1>In call</h1>${mediaControls()}<button id="leave" aria-label="Leave call">Leave</button>`,
+        left: () => `<h1>You left the meeting</h1><button id="rejoin">Rejoin</button>`,
+      };
+
+      let current = "home";
+
+      function show(name) {
+        current = name;
+        screen.innerHTML = screens[name]();
+      }
+
+      function toggleMicrophone() {
+        if (current !== "lobby" && current !== "call") {
+          return;
+        }
+
+        muted = !muted;
+        show(current);
+      }
+
+      const clicks = {
+        "new-meeting": () => show("lobby"),
+        join: () => show("call"),
+        leave: () => show("left"),
+        rejoin: () => show("call"),
+        microphone: toggleMicrophone,
+      };
+
+      document.addEventListener("click", (event) => clicks[event.target.id]?.());
+
+      document.addEventListener("keydown", (event) => {
+        if (event.metaKey && event.keyCode === 68) {
+          toggleMicrophone();
+        }
+      });
+
+      show("home");
+    </script>
   </body>
 </html>
