@@ -108,6 +108,17 @@ test("hotkeys are paused while recording", async () => {
   await expect.poll(() => isRegistered("Control+Alt+M")).toBe(false);
 });
 
+test("changing another setting while recording keeps the hotkeys paused", async () => {
+  const settings = await openSettings();
+  await settings.getByRole("group", { name: "Mute" }).getByRole("button", { name: "Record" }).click();
+  await expect.poll(() => isRegistered("Control+Alt+M")).toBe(false);
+
+  await settings.getByRole("checkbox", { name: "Keep window on top" }).check();
+  await expect.poll(isMeetingWindowOnTop).toBe(true);
+
+  expect(await isRegistered("Control+Alt+M")).toBe(false);
+});
+
 test("Escape cancels recording and keeps the old combination", async () => {
   const settings = await openSettings();
 

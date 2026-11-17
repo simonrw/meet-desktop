@@ -97,7 +97,10 @@ export function startSettings(
   let window: BrowserWindow | undefined;
 
   const applyHotkeys = () => {
-    failed = registerHotkeys(settings.hotkeys, onCommand);
+    // Recording keeps the hotkeys paused, so other changes made meanwhile must not turn them back on.
+    if (recording === undefined) {
+      failed = registerHotkeys(settings.hotkeys, onCommand);
+    }
   };
 
   const apply = () => {
