@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -31,14 +31,56 @@ export function newUserData(): string {
 
 /**
  * Launches the built app against the given Meet origin, with a throwaway user data directory unless given one.
+ *
+ * The app runs Shortcuts through a fake `shortcuts` command, so tests never run the user's real ones. The fake logs
+ * each run for `shortcutsRun`, and fails for Shortcut names starting with "Missing".
  */
 export async function launchApp(meetOrigin: string, userData = newUserData()): Promise<ElectronApplication> {
+  const fakeShortcuts = join(userData, "fake-shortcuts");
+  writeFileSync(
+    fakeShortcuts,
+    `#!/bin/sh
+echo "$*" >> "${join(userData, "shortcuts.log")}"
+case "$2" in
+  Missing*) echo "Error: The operation couldn’t be completed. Couldn’t find shortcut" >&2; exit 1 ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+
   return electron.launch({
     args: ["."],
     env: {
       ...process.env,
       MEET_DESKTOP_MEET_ORIGIN: meetOrigin,
       MEET_DESKTOP_USER_DATA: userData,
+      MEET_DESKTOP_SHORTCUTS: fakeShortcuts,
     },
   });
+}
+
+/**
+ * Lists the arguments of each run of the fake `shortcuts` command by apps launched with this user data directory.
+ */
+export function shortcutsRun(userData: string): string[] {
+  const log = join(userData, "shortcuts.log");
+
+  return existsSync(log) ? readFileSync(log, "utf8").trimEnd().split("\n") : [];
+}
+
+/**
+ * Calls `method` on the Meeting Window, Full or mini, whichever is showing the Meet page.
+ */
+export function onMeetingWindow(app: ElectronApplication, method: "isVisible" | "hide" | "close"): Promise<unknown> {
+  return app.evaluate(
+    ({ BaseWindow, WebContentsView }, method) => {
+      const window = BaseWindow.getAllWindows().find((window) => {
+        const content = window.contentView;
+        return content instanceof WebContentsView && content.webContents.getTitle() === "Stub Meet";
+      });
+
+      return window?.[method]();
+    },
+    method,
+  );
 }

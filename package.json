@@ -15,6 +15,14 @@
   },
   "build": {
     "appId": "dev.simonrw.meet-desktop",
+    "protocols": [
+      {
+        "name": "Meet",
+        "schemes": [
+          "meet-desktop"
+        ]
+      }
+    ],
     "files": [
       "dist/**/*",
       "package.json"

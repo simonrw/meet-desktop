@@ -5,10 +5,12 @@ Google Meet in its own macOS window, with system-wide hotkeys to control the cal
 ## Features
 
 - **Its own window**: Meet runs in a dedicated window with its own Google login, kept separate from your browser profile. The login survives relaunches, and the window remembers its size and position.
+- **Quick joining**: paste a Meet link or meeting code into the join prompt (Cmd+J), or open a `meet-desktop://` URL from a script, Raycast or Alfred.
 - **Menu bar item**: a microphone icon in the menu bar shows whether you're in a call and whether you're muted, and its menu controls the call.
 - **Global hotkeys**: mute, toggle the camera, raise your hand, bring the window forward or leave the call, whichever app is focused.
 - **Screen sharing**: pick a whole screen or a single window to share from the app's own picker.
 - **Safe closing**: closing the window during a call asks before leaving. Outside a call, closing just hides the window.
+- **Focus during calls**: turns a macOS Focus on when you join a call and off when you leave, through two Shortcuts you create.
 - **Links open in your browser**: links clicked inside Meet (for example in chat) open in your default browser. Meet and Google sign-in pages stay in the window.
 
 ## Requirements
@@ -32,6 +34,20 @@ The app is written to `release/mac-arm64/Meet.app` (or `release/mac/Meet.app` on
 Open the app and sign in to Google as you would in a browser, then start or join a meeting.
 
 The first time you join a call, macOS asks for camera and microphone access. Allow both.
+
+### Joining a meeting
+
+Press Cmd+J (or File > Join Meeting…, or Join Meeting… in the menu bar menu) and enter a Meet link such as `https://meet.google.com/abc-defg-hij`, or just the code `abc-defg-hij`. Press Return to open the meeting's pre-join screen. A Meet link that picks one of your Google accounts (`?authuser=1`) opens the meeting under that account. If you copied a Meet link or code before opening the prompt, it's already filled in, so Return joins it straight away. Escape closes the prompt.
+
+To open a meeting from a script, Raycast or Alfred, open a URL in the app's own scheme:
+
+```sh
+open meet-desktop://abc-defg-hij
+```
+
+This works whether or not Meet is running. The scheme is only registered for the packaged app, not for `npm start`.
+
+Joining another meeting during a call asks first whether to leave the current one.
 
 ### Hotkeys
 
@@ -57,7 +73,7 @@ The microphone icon in the menu bar shows where you are:
 - **Filled**: in a call.
 - **Crossed out**: in a call and muted.
 
-Click it for Mute, Turn Off Camera, Show Window, Leave Call…, Settings… and Quit Meet. Mute, camera and Leave Call are greyed out outside a call. Leave Call asks before hanging up, as the hotkey does. The menu works while the window is hidden.
+Click it for Mute, Turn Off Camera, Show Window, Toggle Mini Mode, Leave Call…, Join Meeting…, Settings… and Quit Meet. Mute, camera and Leave Call are greyed out outside a call. Leave Call asks before hanging up, as the hotkey does. The menu works while the window is hidden.
 
 ### Settings
 
@@ -68,6 +84,18 @@ Open settings with Cmd+, (or Meet > Settings…, or Settings… in the menu bar 
 - **Launch at login**: opens Meet when you log in. This is the same setting as System Settings > General > Login Items.
 
 If another app (for example Raycast or Alfred) already uses a combination, or another hotkey in Meet does, the settings window says so and keeps your previous combination. Record a different one.
+
+### Focus during calls
+
+Meet can turn on a macOS Focus while you're in a call, so notifications don't interrupt you or show up while you share your screen. macOS doesn't let apps set a Focus directly, so Meet runs two Shortcuts that you create:
+
+1. In the Shortcuts app, create a shortcut named "Turn On Meeting Focus" with the "Set Focus" action, set to turn your chosen Focus on.
+2. Create a second shortcut named "Turn Off Meeting Focus" with "Set Focus" set to turn the same Focus off.
+3. In Meet's settings, turn on "Turn on a Focus during calls". If you named the shortcuts differently, enter their names. Press Test to check both run.
+
+The Focus turns on once you're in the call (not in the pre-join screen) and turns off about 30 seconds after you leave, however you leave. Joining another call within those 30 seconds keeps the Focus on. Quitting Meet during a call turns the Focus off, and if Meet crashes during a call, it turns the Focus off the next time it opens.
+
+If a shortcut fails (for example, it was renamed), the menu bar menu says so. The call carries on regardless.
 
 ### Sharing your screen
 
@@ -86,6 +114,7 @@ macOS only lets approved apps record the screen. The first time you share, Meet 
 - **A hotkey does nothing**: check you're in a call rather than in the pre-join screen. Check the settings window for a message saying another app owns the combination.
 - **Mute or camera hotkeys stopped working after a Meet update**: Google may have changed Meet's page. Please open an issue.
 - **A control is missing in a narrow window**: when Meet moves a button into its overflow menu, its hotkey can't reach it. Widen the window.
+- **The Focus doesn't turn on or off**: press Test in the Focus section of the settings window, which reports which shortcut failed. Check the names match the shortcuts in the Shortcuts app exactly.
 - **Screen sharing shows a permission message every time**: check Meet is turned on under System Settings > Privacy & Security > Screen & System Audio Recording, then quit and reopen Meet.
 
 ## Development

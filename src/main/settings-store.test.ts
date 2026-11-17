@@ -22,7 +22,41 @@ describe("loadSettings", () => {
       "toggle-hand": "Control+Alt+H",
       "show-window": "Control+Alt+S",
       "leave-call": "Control+Alt+L",
+      "toggle-mini-mode": "Control+Alt+P",
     });
+  });
+
+  test("leaves auto Mini Mode off and the mini window opaque when there is no settings file", () => {
+    const settings = loadSettings(file);
+
+    expect(settings.autoMiniMode).toBe(false);
+    expect(settings.miniModeOpacity).toBe(1);
+  });
+
+  test("keeps saved Mini Mode options", () => {
+    writeFileSync(file, JSON.stringify({ autoMiniMode: true, miniModeOpacity: 0.8 }));
+
+    const settings = loadSettings(file);
+
+    expect(settings.autoMiniMode).toBe(true);
+    expect(settings.miniModeOpacity).toBe(0.8);
+  });
+
+  test("defaults malformed Mini Mode options", () => {
+    writeFileSync(file, JSON.stringify({ autoMiniMode: "yes", miniModeOpacity: "half" }));
+
+    const settings = loadSettings(file);
+
+    expect(settings.autoMiniMode).toBe(false);
+    expect(settings.miniModeOpacity).toBe(1);
+  });
+
+  test("defaults a Mini Mode opacity that would make the mini window too faint or invalid", () => {
+    for (const miniModeOpacity of [0, 0.2, 1.5]) {
+      writeFileSync(file, JSON.stringify({ miniModeOpacity }));
+
+      expect(loadSettings(file).miniModeOpacity).toBe(1);
+    }
   });
 
   test("uses the defaults when the settings file is corrupt", () => {
@@ -74,8 +108,26 @@ describe("loadSettings", () => {
     expect(settings.hotkeys["toggle-mute"]).toBe("Command+Shift+M");
   });
 
+  test("leaves the Focus Integration off until the user turns it on", () => {
+    expect(loadSettings(file).focus).toEqual({
+      enabled: false,
+      turnOnShortcut: "Turn On Meeting Focus",
+      turnOffShortcut: "Turn Off Meeting Focus",
+    });
+  });
+
+  test("keeps valid Focus settings and defaults the missing or malformed ones", () => {
+    writeFileSync(file, JSON.stringify({ focus: { enabled: true, turnOnShortcut: "Focus On", turnOffShortcut: 3 } }));
+
+    expect(loadSettings(file).focus).toEqual({
+      enabled: true,
+      turnOnShortcut: "Focus On",
+      turnOffShortcut: "Turn Off Meeting Focus",
+    });
+  });
+
   test("ignores hotkeys it does not know", () => {
-    writeFileSync(file, JSON.stringify({ hotkeys: { "toggle-mini-mode": "Control+Alt+P" } }));
+    writeFileSync(file, JSON.stringify({ hotkeys: { "toggle-recording": "Control+Alt+R" } }));
 
     expect(loadSettings(file)).toEqual(DEFAULT_SETTINGS);
   });
@@ -87,6 +139,9 @@ describe("saveSettings", () => {
       ...DEFAULT_SETTINGS,
       hotkeys: { ...DEFAULT_SETTINGS.hotkeys, "toggle-mute": "Command+Shift+M", "leave-call": null },
       alwaysOnTop: true,
+      focus: { enabled: true, turnOnShortcut: "Focus On", turnOffShortcut: "Focus Off" },
+      autoMiniMode: true,
+      miniModeOpacity: 0.7,
     };
 
     saveSettings(file, changed);

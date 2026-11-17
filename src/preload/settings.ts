@@ -4,6 +4,7 @@
 import { ipcRenderer } from "electron";
 
 import type { ChangeChannel, SettingsChange, SettingsView, ViewChannel } from "../main/settings";
+import type { FocusSettings } from "../main/settings-store";
 
 const VIEW_CHANNEL: ViewChannel = "settings:view";
 const CHANGE_CHANNEL: ChangeChannel = "settings:change";
@@ -69,6 +70,98 @@ function option(type: OptionType, text: string, enabled: boolean): HTMLElement {
   return label;
 }
 
+function focusSection(focus: SettingsView["focus"]): HTMLElement[] {
+  const enabled = document.createElement("input");
+  enabled.type = "checkbox";
+  enabled.id = "focus-enabled";
+  enabled.checked = focus.enabled;
+  enabled.addEventListener("change", () => change({ type: "focus", focus: { enabled: enabled.checked } }));
+
+  const enabledLabel = document.createElement("label");
+  enabledLabel.append(enabled, " Turn on a Focus during calls");
+
+  const help = document.createElement("div");
+  help.className = "help";
+  help.innerHTML = `
+    <p>macOS doesn't let apps turn a Focus on directly, so Meet runs two Shortcuts that you create:</p>
+    <ol>
+      <li>Open the Shortcuts app and create a shortcut with the "Set Focus" action, set to turn your chosen Focus on.</li>
+      <li>Create a second shortcut with "Set Focus" set to turn the same Focus off.</li>
+      <li>Enter the two shortcut names below, then press Test.</li>
+    </ol>`;
+
+  const test = button("focus-test", "Test", async () => {
+    test.disabled = true;
+    test.textContent = "Testing…";
+    await change({ type: "test-focus" });
+  });
+
+  const elements: HTMLElement[] = [
+    enabledLabel,
+    help,
+    shortcutField("focus-turn-on", "Turn on Shortcut", focus.turnOnShortcut, (turnOnShortcut) => ({ turnOnShortcut })),
+    shortcutField("focus-turn-off", "Turn off Shortcut", focus.turnOffShortcut, (turnOffShortcut) => ({
+      turnOffShortcut,
+    })),
+    test,
+  ];
+
+  if (focus.testResult) {
+    const result = document.createElement("p");
+    result.className = `test-result ${focus.testResult.ok ? "ok" : "error"}`;
+    result.setAttribute("role", focus.testResult.ok ? "status" : "alert");
+    result.textContent = focus.testResult.message;
+    elements.push(result);
+  }
+
+  return elements;
+}
+
+function shortcutField(
+  id: string,
+  text: string,
+  value: string,
+  changed: (value: string) => Partial<FocusSettings>,
+): HTMLElement {
+  const input = document.createElement("input");
+  input.id = id;
+  input.value = value;
+  input.addEventListener("change", () => change({ type: "focus", focus: changed(input.value) }));
+
+  const label = document.createElement("label");
+  label.className = "shortcut";
+  label.append(text, input);
+
+  return label;
+}
+
+function autoMiniModeOption(enabled: boolean): HTMLElement {
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.id = "auto-mini-mode";
+  checkbox.checked = enabled;
+  checkbox.addEventListener("change", () => change({ type: "auto-mini-mode", enabled: checkbox.checked }));
+
+  const label = document.createElement("label");
+  label.append(checkbox, " Enter Mini Mode when I switch to another app during a call");
+
+  return label;
+}
+
+function miniModeOpacityOption(opacity: number, opacities: number[]): HTMLElement {
+  const select = document.createElement("select");
+  select.id = "mini-mode-opacity";
+  for (const choice of opacities) {
+    select.append(new Option(`${Math.round(choice * 100)}%`, String(choice), false, choice === opacity));
+  }
+  select.addEventListener("change", () => change({ type: "mini-mode-opacity", opacity: Number(select.value) }));
+
+  const label = document.createElement("label");
+  label.append("Mini Mode opacity ", select);
+
+  return label;
+}
+
 function heading(text: string): HTMLElement {
   const element = document.createElement("h2");
   element.textContent = text;
@@ -85,6 +178,11 @@ function render(view: SettingsView): void {
   document.body.replaceChildren(
     heading("Hotkeys"),
     ...view.hotkeys.map(hotkeyRow),
+    heading("Mini Mode"),
+    autoMiniModeOption(view.autoMiniMode),
+    miniModeOpacityOption(view.miniModeOpacity, view.miniModeOpacities),
+    heading("Focus"),
+    ...focusSection(view.focus),
     heading("General"),
     option("launch-at-login", "Launch at login", view.launchAtLogin),
     option("always-on-top", "Keep window on top", view.alwaysOnTop),

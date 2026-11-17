@@ -9,6 +9,14 @@ If a step fails, the Meet hooks in `src/preload/meet-bridge.ts` are the first pl
 - [ ] Launch the app and start or open a meeting. In the lobby (Meet's pre-join screen), the app has not yet treated you as in a call (the mute hotkey does nothing).
 - [ ] Join the meeting. Camera and microphone work.
 
+## Join prompt and URL scheme
+
+- [ ] Copy a real Meet link (from a calendar invite), focus another app and choose Join Meeting… in the menu bar menu: the prompt comes to the front with the meeting code filled in. Press Return: the Meeting Window comes to the front on that meeting's pre-join screen.
+- [ ] Copy some ordinary text and press Cmd+J in the app: the prompt opens empty. Type `nonsense` and press Return: an error shows under the field and nothing else happens. Press Escape: the prompt closes.
+- [ ] Join a call, then use the prompt to join another meeting: the window asks "Leave the call and join …?". Cancel: the call carries on. Try again and choose Leave and Join: the other meeting's pre-join screen opens and you have left the first call (check from a second device).
+- [ ] With the app running and its window hidden, run `open meet-desktop://<code>` in Terminal: the Meeting Window comes to the front on that meeting's pre-join screen.
+- [ ] Quit the app and run the same command: the app launches straight onto that meeting's pre-join screen.
+
 ## Mute by hotkey
 
 The default mute hotkey is Control+Option+M.
@@ -58,6 +66,34 @@ The default leave hotkey is Control+Option+L.
 - [ ] Close the Meeting Window, then use Turn Off Camera and Show Window from the menu: the camera toggles in Meet and the window comes back.
 - [ ] Choose Leave Call… from the menu: the window comes forward asking "Leave the call?". Choose Leave: the icon goes back to outlined.
 - [ ] Settings… opens the settings window, and Quit Meet quits the app.
+
+## Mini Mode
+
+The default Mini Mode hotkey is Control+Option+P.
+
+- [ ] Choose Toggle Mini Mode from the menu bar: the Meeting Window becomes a small window with no title bar, and the call carries on. Choose it again: the Full window comes back where it was.
+- [ ] Focus another app and press the Mini Mode hotkey: the mini window appears without taking the keyboard from that app. Press it again: the Full window comes forward.
+- [ ] In Mini Mode, click another app's window: the mini window stays on top. Switch to another Space and to a full-screen app: the mini window is there too.
+- [ ] Drag the mini window by the strip along its top edge: it follows the pointer smoothly. Resize it from an edge or corner.
+- [ ] Switch to Full and back: each comes back at its own size and position, also after quitting and relaunching.
+- [ ] Double-click the strip along the top of the mini window: the Full window comes back.
+- [ ] Enter Mini Mode during a call and leave with Meet's leave button: the Full window comes back.
+- [ ] Turn on "Enter Mini Mode when I switch to another app during a call". In a call, Cmd+Tab to another app: the mini window appears. Outside a call, Cmd+Tab away: the Full window stays as it is.
+- [ ] Set "Mini Mode opacity" to 70%: the mini window is see-through, and the Full window is not.
+- [ ] In Mini Mode, share your screen from Meet: the Source Picker appears and sharing works.
+
+## Focus
+
+Create the two Shortcuts described in the README's "Focus during calls" section, using a Focus whose indicator you can see in the menu bar.
+
+- [ ] In settings, press Test in the Focus section: the Focus turns on and then off, and the window says both Shortcuts ran.
+- [ ] Turn on "Turn on a Focus during calls". Open a meeting: in the lobby the Focus stays off. Join: the Focus turns on.
+- [ ] Leave with Meet's leave button: about 30 seconds later the Focus turns off.
+- [ ] Join, leave, and rejoin within 30 seconds: the Focus stays on throughout, and turns off about 30 seconds after the final leave.
+- [ ] Join and leave with the leave hotkey, then join and close the Meeting Window choosing Leave: each time the Focus turns off about 30 seconds later.
+- [ ] Join and quit Meet with Cmd+Q: the Focus turns off before the app quits.
+- [ ] Join, then force quit Meet (Activity Monitor > Force Quit): the Focus stays on. Open Meet again: the Focus turns off.
+- [ ] Rename the turn on Shortcut in the Shortcuts app and join: the menu bar menu says the Focus wasn't turned on, and the call carries on. Rename it back.
 
 ## Settings
 

@@ -2,13 +2,13 @@ import { join } from "node:path";
 
 import {
   BrowserWindow,
+  type BaseWindow,
   desktopCapturer,
   dialog,
   shell,
   systemPreferences,
   type DesktopCapturerSource,
   type Session,
-  type WebContents,
 } from "electron";
 
 export type SourcesChannel = "source-picker:sources";
@@ -55,10 +55,10 @@ const PICKER_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctyp
 
 /**
  * Sets up screen sharing for pages in the given session. The returned function answers a page's display-capture
- * permission request: it lets the user pick a screen or window to share, after guiding them to the Screen Recording
- * permission when macOS hasn't granted it, and resolves to whether something was picked.
+ * permission request over the given Meeting Window: it lets the user pick a screen or window to share, after guiding
+ * them to the Screen Recording permission when macOS hasn't granted it, and resolves to whether something was picked.
  */
-export function shareScreenOnRequest(meetSession: Session): (requester: WebContents) => Promise<boolean> {
+export function shareScreenOnRequest(meetSession: Session): (meetingWindow: BaseWindow) => Promise<boolean> {
   let picked: DesktopCapturerSource | undefined;
 
   meetSession.setDisplayMediaRequestHandler((_request, respond) => {
@@ -68,15 +68,14 @@ export function shareScreenOnRequest(meetSession: Session): (requester: WebConte
 
   // The pick happens in the permission request, ahead of the display media request, because only a refused
   // permission reaches Meet as the cancelled share it expects.
-  return async (requester) => {
-    const requestingWindow = BrowserWindow.fromWebContents(requester);
-    picked = requestingWindow ? await chooseSource(requestingWindow).catch(reportFailure) : undefined;
+  return async (meetingWindow) => {
+    picked = await chooseSource(meetingWindow).catch(reportFailure);
 
     return picked !== undefined;
   };
 }
 
-async function chooseSource(meetingWindow: BrowserWindow): Promise<DesktopCapturerSource | undefined> {
+async function chooseSource(meetingWindow: BaseWindow): Promise<DesktopCapturerSource | undefined> {
   if (systemPreferences.getMediaAccessStatus("screen") !== "granted") {
     await explainScreenRecordingPermission(meetingWindow);
     return undefined;
@@ -91,7 +90,7 @@ function reportFailure(error: unknown): undefined {
   console.error("Screen share failed", error);
 }
 
-async function explainScreenRecordingPermission(meetingWindow: BrowserWindow): Promise<void> {
+async function explainScreenRecordingPermission(meetingWindow: BaseWindow): Promise<void> {
   const { response } = await dialog.showMessageBox(meetingWindow, {
     type: "info",
     message: "Meet needs permission to share your screen",
@@ -118,7 +117,7 @@ async function explainScreenRecordingPermission(meetingWindow: BrowserWindow): P
  * is closed without a pick.
  */
 function pickSource(
-  meetingWindow: BrowserWindow,
+  meetingWindow: BaseWindow,
   sources: DesktopCapturerSource[],
 ): Promise<DesktopCapturerSource | undefined> {
   const picker = new BrowserWindow({

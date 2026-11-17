@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
-import { launchApp, startStubMeet } from "./app";
+import { launchApp, onMeetingWindow, startStubMeet } from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
 let app: ElectronApplication;
@@ -32,7 +32,7 @@ function click(id: string) {
 }
 
 function meetingWindowVisible() {
-  return app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible());
+  return onMeetingWindow(app, "isVisible");
 }
 
 async function joinCall() {
@@ -62,13 +62,15 @@ test("the icon follows the Meet page into a call, through mute and unmute, and o
 });
 
 test("call-only items are enabled only during a call", async () => {
-  await expect.poll(enabledItems).toEqual(["show-window", "settings", "quit"]);
+  await expect.poll(enabledItems).toEqual(["show-window", "toggle-mini-mode", "join-meeting", "settings", "quit"]);
 
   await joinCall();
-  await expect.poll(enabledItems).toEqual(["toggle-mute", "toggle-camera", "show-window", "leave-call", "settings", "quit"]);
+  await expect
+    .poll(enabledItems)
+    .toEqual(["toggle-mute", "toggle-camera", "show-window", "toggle-mini-mode", "leave-call", "join-meeting", "settings", "quit"]);
 
   await page.getByRole("button", { name: "Leave call" }).click();
-  await expect.poll(enabledItems).toEqual(["show-window", "settings", "quit"]);
+  await expect.poll(enabledItems).toEqual(["show-window", "toggle-mini-mode", "join-meeting", "settings", "quit"]);
 });
 
 test("the mute item mutes Meet and the icon shows it", async () => {
@@ -89,7 +91,7 @@ test("the camera item toggles Meet's camera", async () => {
 });
 
 test("the show window item brings back a hidden Meeting Window", async () => {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.hide());
+  await onMeetingWindow(app, "hide");
 
   await click("show-window");
 

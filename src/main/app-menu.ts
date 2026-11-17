@@ -1,9 +1,18 @@
 import { app, Menu } from "electron";
 
 /**
- * Sets the macOS menu bar menus, with a Settings item (Cmd+,) in the app menu that calls `openSettings`.
+ * Opens the app's own windows from a menu.
  */
-export function setAppMenu(openSettings: () => void): void {
+export interface WindowOpeners {
+  openJoinPrompt(): void;
+  openSettings(): void;
+}
+
+/**
+ * Sets the macOS menu bar menus, with a Settings item (Cmd+,) in the app menu and a Join Meeting item (Cmd+J) in the
+ * File menu.
+ */
+export function setAppMenu({ openSettings, openJoinPrompt }: WindowOpeners): void {
   const menu = Menu.buildFromTemplate([
     {
       label: app.name,
@@ -21,7 +30,14 @@ export function setAppMenu(openSettings: () => void): void {
         { role: "quit" },
       ],
     },
-    { role: "fileMenu" },
+    {
+      label: "File",
+      submenu: [
+        { id: "join-meeting", label: "Join Meeting…", accelerator: "CommandOrControl+J", click: openJoinPrompt },
+        { type: "separator" },
+        { role: "close" },
+      ],
+    },
     { role: "editMenu" },
     { role: "viewMenu" },
     { role: "windowMenu" },

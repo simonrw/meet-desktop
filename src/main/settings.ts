@@ -4,9 +4,18 @@ import { app, BrowserWindow } from "electron";
 
 import { acceleratorFromKey, acceleratorLabel, type RecordedKey } from "./accelerator";
 import { pauseHotkeys, registerHotkeys } from "./hotkeys";
+import type { FocusTestResult } from "./focus-integration";
 import type { Command } from "./meeting-controller";
-import type { MeetingWindow } from "./meeting-window";
-import { HOTKEY_NAMES, loadSettings, saveSettings, type HotkeyName, type Settings } from "./settings-store";
+import {
+  HOTKEY_NAMES,
+  isMiniModeOpacity,
+  loadSettings,
+  MINI_MODE_OPACITIES,
+  saveSettings,
+  type FocusSettings,
+  type HotkeyName,
+  type Settings,
+} from "./settings-store";
 
 export type ViewChannel = "settings:view";
 export type ChangeChannel = "settings:change";
@@ -26,6 +35,15 @@ export interface SettingsView {
   }>;
   launchAtLogin: boolean;
   alwaysOnTop: boolean;
+  focus: FocusSettings & {
+    /** How the last test of the Focus Shortcuts went, until the settings change. */
+    testResult?: FocusTestResult;
+  };
+  autoMiniMode: boolean;
+  miniModeOpacity: number;
+
+  /** The opacities the user can choose for the mini window. */
+  miniModeOpacities: number[];
 }
 
 /**
@@ -37,9 +55,21 @@ export type SettingsChange =
   | { type: "cancel-recording" }
   | { type: "turn-off"; name: HotkeyName }
   | { type: "launch-at-login"; enabled: boolean }
-  | { type: "always-on-top"; enabled: boolean };
+  | { type: "always-on-top"; enabled: boolean }
+  | { type: "focus"; focus: Partial<FocusSettings> }
+  | { type: "test-focus" }
+  | { type: "auto-mini-mode"; enabled: boolean }
+  | { type: "mini-mode-opacity"; opacity: number };
 
 export interface SettingsWindow {
+  /** The settings as they are now. */
+  readonly settings: Settings;
+
+  /**
+   * Calls `listener` with the new settings each time the user changes them.
+   */
+  onChange(listener: (settings: Settings) => void): void;
+
   /**
    * Opens the settings window, or brings it to the front when it's already open.
    */
@@ -57,6 +87,7 @@ const HOTKEY_LABELS: Record<HotkeyName, string> = {
   "toggle-hand": "Raise hand",
   "show-window": "Show window",
   "leave-call": "Leave call",
+  "toggle-mini-mode": "Mini Mode",
 };
 
 const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
@@ -74,6 +105,12 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
       kbd.off { color: GrayText; }
       .error { grid-column: 1 / -1; margin: 0; color: #d70015; }
       label { display: block; padding: 2px 0; }
+      .shortcut { display: grid; grid-template-columns: 9em 1fr; gap: 8px; align-items: center; padding: 4px 0; }
+      .help { margin: 4px 0 8px; color: GrayText; }
+      .help ol { margin: 4px 0; padding-left: 20px; }
+      .test-result { margin: 8px 0 0; }
+      .test-result.ok { color: #248a3d; }
+      label { display: block; padding: 4px 0; }
     </style>
   </head>
   <body></body>
@@ -81,12 +118,12 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
 
 /**
  * Loads the user's settings and applies them, registering the hotkeys that are turned on, which send their Commands
- * to `onCommand`, and keeping `meetingWindow` on top when the user asked for it. Returns the settings window, where
- * each change takes effect straight away.
+ * to `onCommand`. Returns the settings window, where each change takes effect straight away, and whose Focus test
+ * button calls `testFocus`.
  */
 export function startSettings(
-  meetingWindow: Pick<MeetingWindow, "keepOnTop">,
   onCommand: (command: Command) => void,
+  testFocus: () => Promise<FocusTestResult>,
 ): SettingsWindow {
   const file = join(app.getPath("userData"), "settings.json");
 
@@ -94,18 +131,15 @@ export function startSettings(
   let failed: HotkeyName[] = [];
   let refusal: { name: HotkeyName; accelerator: string; owner: string } | undefined;
   let recording: HotkeyName | undefined;
+  let focusTestResult: FocusTestResult | undefined;
   let window: BrowserWindow | undefined;
+  const listeners: Array<(settings: Settings) => void> = [];
 
   const applyHotkeys = () => {
     // Recording keeps the hotkeys paused, so other changes made meanwhile must not turn them back on.
     if (recording === undefined) {
       failed = registerHotkeys(settings.hotkeys, onCommand);
     }
-  };
-
-  const apply = () => {
-    applyHotkeys();
-    meetingWindow.keepOnTop(settings.alwaysOnTop);
   };
 
   const bind = (name: HotkeyName, accelerator: string | null): Settings => {
@@ -115,7 +149,12 @@ export function startSettings(
   const save = (changed: Settings) => {
     settings = changed;
     saveSettings(file, settings);
-    apply();
+    listeners.forEach((listener) => listener(settings));
+  };
+
+  const saveHotkeys = (changed: Settings) => {
+    save(changed);
+    applyHotkeys();
   };
 
   const stopRecording = () => {
@@ -156,10 +195,10 @@ export function startSettings(
       return;
     }
 
-    save(changed);
+    saveHotkeys(changed);
   };
 
-  const change = (change: SettingsChange) => {
+  const change = async (change: SettingsChange) => {
     switch (change.type) {
       case "record":
         refusal = undefined;
@@ -181,7 +220,7 @@ export function startSettings(
 
       case "turn-off":
         refusal = undefined;
-        save(bind(change.name, null));
+        saveHotkeys(bind(change.name, null));
         break;
 
       case "launch-at-login":
@@ -190,6 +229,25 @@ export function startSettings(
 
       case "always-on-top":
         save({ ...settings, alwaysOnTop: change.enabled });
+        break;
+
+      case "focus":
+        focusTestResult = undefined;
+        save({ ...settings, focus: { ...settings.focus, ...change.focus } });
+        break;
+
+      case "test-focus":
+        focusTestResult = await testFocus();
+        break;
+
+      case "auto-mini-mode":
+        save({ ...settings, autoMiniMode: change.enabled });
+        break;
+
+      case "mini-mode-opacity":
+        if (isMiniModeOpacity(change.opacity)) {
+          save({ ...settings, miniModeOpacity: change.opacity });
+        }
         break;
     }
   };
@@ -224,11 +282,23 @@ export function startSettings(
     }),
     launchAtLogin: app.getLoginItemSettings().openAtLogin,
     alwaysOnTop: settings.alwaysOnTop,
+    focus: { ...settings.focus, testResult: focusTestResult },
+    autoMiniMode: settings.autoMiniMode,
+    miniModeOpacity: settings.miniModeOpacity,
+    miniModeOpacities: MINI_MODE_OPACITIES,
   });
 
-  apply();
+  applyHotkeys();
 
   return {
+    get settings() {
+      return settings;
+    },
+
+    onChange(listener) {
+      listeners.push(listener);
+    },
+
     open() {
       if (window) {
         window.focus();
@@ -237,7 +307,7 @@ export function startSettings(
 
       window = new BrowserWindow({
         width: 460,
-        height: 340,
+        height: 720,
         useContentSize: true,
         title: "Settings",
         resizable: false,
@@ -252,14 +322,15 @@ export function startSettings(
       });
 
       window.webContents.ipc.handle(VIEW_CHANNEL, view);
-      window.webContents.ipc.handle(CHANGE_CHANNEL, (_event, requested: SettingsChange) => {
-        change(requested);
+      window.webContents.ipc.handle(CHANGE_CHANNEL, async (_event, requested: SettingsChange) => {
+        await change(requested);
         return view();
       });
 
       window.once("closed", () => {
         window = undefined;
         refusal = undefined;
+        focusTestResult = undefined;
         stopRecording();
       });
 
