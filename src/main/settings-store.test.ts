@@ -48,11 +48,11 @@ describe("loadSettings", () => {
     expect(hotkeys["toggle-hand"]).toBe("Control+Alt+H");
   });
 
-  test("keeps the window off top when there is no settings file", () => {
+  test("leaves the Meeting Window off top by default", () => {
     expect(loadSettings(file).alwaysOnTop).toBe(false);
   });
 
-  test("keeps the window off top when the settings file is corrupt", () => {
+  test("leaves the Meeting Window off top when the settings file is corrupt", () => {
     writeFileSync(file, "{ not json");
 
     expect(loadSettings(file).alwaysOnTop).toBe(false);

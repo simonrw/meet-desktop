@@ -54,7 +54,9 @@ function hotkeyRow(hotkey: SettingsView["hotkeys"][number]): HTMLElement {
   return row;
 }
 
-function option(type: "launch-at-login" | "always-on-top", text: string, enabled: boolean): HTMLElement {
+type OptionType = Extract<SettingsChange, { enabled: boolean }>["type"];
+
+function option(type: OptionType, text: string, enabled: boolean): HTMLElement {
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.id = type;
