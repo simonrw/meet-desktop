@@ -3,7 +3,16 @@ import { join } from "node:path";
 
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
-import { launchApp, newUserData, shortcutsRun, startStubMeet, updatesInstalled, type LatestRelease } from "./app";
+import {
+  answerNextQuestion,
+  clickMenuItem,
+  launchApp,
+  newUserData,
+  shortcutsRun,
+  startStubMeet,
+  updatesInstalled,
+  type LatestRelease,
+} from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
 let userData: string;
@@ -46,7 +55,7 @@ function meetingState() {
 }
 
 function restartToUpdate() {
-  return app.evaluate(() => globalThis.menuBar?.menu.getMenuItemById("restart-to-update")?.click());
+  return clickMenuItem(app, "menu bar", "restart-to-update");
 }
 
 function lastWritten(log: "shortcuts.log" | "installed-updates.log") {
@@ -141,36 +150,13 @@ test("without the override, the app never checks for Updates", async () => {
   expect(logs).not.toContain("Checking for Updates");
 });
 
-type Question = { message: string; detail: string; buttons: string[] };
-
-/**
- * Answers the next question the app asks with the button labelled `button`, or the first button if none is given,
- * resolving to what it asked.
- */
-function answerNextQuestion(button?: string) {
-  // A real dialog would block the test until someone answered it.
-  return app.evaluate(
-    ({ dialog }, button) =>
-      new Promise<Question>((resolve) => {
-        dialog.showMessageBox = async (...args: unknown[]) => {
-          const options = args.at(-1) as Electron.MessageBoxOptions;
-          const question = { message: options.message, detail: options.detail ?? "", buttons: options.buttons ?? [] };
-          resolve(question);
-
-          return { response: Math.max(question.buttons.indexOf(button ?? ""), 0), checkboxChecked: false };
-        };
-      }),
-    button,
-  );
-}
-
 function checkForUpdates() {
-  return app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("check-for-updates")?.click());
+  return clickMenuItem(app, "app menu", "check-for-updates");
 }
 
 test("checking for Updates with nothing newer reports the running version is the latest", async () => {
   await launch({ version: runningVersion });
-  const asked = answerNextQuestion();
+  const asked = answerNextQuestion(app);
 
   await checkForUpdates();
 
@@ -181,7 +167,7 @@ test("checking for Updates finds a Release published since launch and offers to 
   await launch({ version: runningVersion });
   await expect.poll(() => logs).toContain("Checking for Updates");
   writeFileSync(join(userData, "latest-release.json"), JSON.stringify({ version: "99.0.0" }));
-  const asked = answerNextQuestion("Later");
+  const asked = answerNextQuestion(app, "Later");
 
   await checkForUpdates();
 
@@ -192,7 +178,7 @@ test("checking for Updates finds a Release published since launch and offers to 
 test("restarting from the check for Updates dialog installs the Update", async () => {
   await launch({ version: "99.0.0" });
   await expect.poll(restartItem).toMatchObject({ enabled: true });
-  const asked = answerNextQuestion("Restart");
+  const asked = answerNextQuestion(app, "Restart");
   const closed = app.waitForEvent("close");
 
   await checkForUpdates();
@@ -206,7 +192,7 @@ test("during a call, the check for Updates dialog doesn't offer to restart", asy
   await launch({ version: "99.0.0" });
   await expect.poll(restartItem).toMatchObject({ enabled: true });
   await joinCall();
-  const asked = answerNextQuestion();
+  const asked = answerNextQuestion(app);
 
   await checkForUpdates();
 
@@ -217,7 +203,7 @@ test("during a call, the check for Updates dialog doesn't offer to restart", asy
 
 test("a failed check for Updates says why", async () => {
   await launch({ error: "The Release feed is unreachable" });
-  const asked = answerNextQuestion();
+  const asked = answerNextQuestion(app);
 
   await checkForUpdates();
 
@@ -230,7 +216,7 @@ test("a failed check for Updates says why", async () => {
 
 test("without the override, checking for Updates says this copy never updates", async () => {
   await launch();
-  const asked = answerNextQuestion();
+  const asked = answerNextQuestion(app);
 
   await checkForUpdates();
 
