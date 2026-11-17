@@ -15,8 +15,7 @@ export interface MenuBar {
  * Commands to the Meeting Controller, opens the Join Prompt and settings, and restarts to install a downloaded Update.
  */
 export function startMenuBar(controller: MeetingController, updates: Updates, openers: WindowOpeners): MenuBar {
-  const send = (type: PlainCommand["type"]) => () => controller.command({ type });
-  const menuFor = () => buildMenu(controller.state, controller.integrationFailures, updates, send, openers);
+  const menuFor = () => buildMenu(controller, updates, openers);
 
   let icon = iconFor(controller.state);
   let menu = menuFor();
@@ -58,16 +57,11 @@ function iconFor(state: MeetingState): MenuBarIcon {
   return state.muted ? "muted" : "in-call";
 }
 
-function buildMenu(
-  state: MeetingState,
-  integrationFailures: string[],
-  updates: Updates,
-  send: (type: PlainCommand["type"]) => () => void,
-  openers: WindowOpeners,
-): Menu {
-  const inCall = state.status === "in-call";
+function buildMenu(controller: MeetingController, updates: Updates, openers: WindowOpeners): Menu {
+  const { state, inCall } = controller;
+  const send = (type: PlainCommand["type"]) => () => controller.command({ type });
 
-  const failureItems: MenuItemConstructorOptions[] = integrationFailures.map((failure) => ({
+  const failureItems: MenuItemConstructorOptions[] = controller.integrationFailures.map((failure) => ({
     label: failure,
     enabled: false,
   }));
@@ -92,13 +86,13 @@ function buildMenu(
     ...failureItems,
     {
       id: "toggle-mute",
-      label: inCall && state.muted ? "Unmute" : "Mute",
+      label: state.status === "in-call" && state.muted ? "Unmute" : "Mute",
       enabled: inCall,
       click: send("toggle-mute"),
     },
     {
       id: "toggle-camera",
-      label: inCall && !state.cameraOn ? "Turn On Camera" : "Turn Off Camera",
+      label: state.status === "in-call" && !state.cameraOn ? "Turn On Camera" : "Turn Off Camera",
       enabled: inCall,
       click: send("toggle-camera"),
     },

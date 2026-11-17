@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { app } from "electron";
 
 import { setAppMenu } from "./app-menu";
+import { fakeUpdateSource } from "./fake-update-source";
 import { focusIntegration, shortcutRunner } from "./focus-integration";
 import { fileLedger } from "./integration-ledger";
 import { startJoinPrompt } from "./join-prompt";
@@ -13,7 +14,7 @@ import { createMeetingWindow } from "./meeting-window";
 import { startMenuBar, type MenuBar } from "./menu-bar";
 import { startSettings } from "./settings";
 import type { Settings } from "./settings-store";
-import { startUpdates } from "./updates";
+import { electronUpdaterSource, startUpdates, type UpdateSource } from "./updates";
 
 declare global {
   // Lets end-to-end tests read the Meeting State and send Commands. Set in unpackaged builds only.
@@ -95,9 +96,9 @@ if (!app.requestSingleInstanceLock()) {
       autoMiniMode: () => settingsWindow.settings.autoMiniMode,
     });
 
-    restoreIntegrationsBeforeQuitting(meetingController);
+    const restoreIntegrations = restoreIntegrationsBeforeQuitting(meetingController);
 
-    const updates = startUpdates(meetingController, unpackagedOverride("MEET_DESKTOP_UPDATES"));
+    const updates = startUpdates(meetingController, restoreIntegrations, updateSource());
     setAppMenu(openers, updates);
     const menuBar = startMenuBar(meetingController, updates, openers);
 
@@ -121,10 +122,30 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 /**
- * Holds off quitting until the Meeting Controller has restored the Integrations applied for a call.
+ * Chooses where Updates come from: GitHub Releases for packaged builds, and nothing for unpackaged ones unless the
+ * `MEET_DESKTOP_UPDATES` override names a fake update source's file.
  */
-function restoreIntegrationsBeforeQuitting(meetingController: MeetingController): void {
+function updateSource(): UpdateSource | undefined {
+  if (app.isPackaged) {
+    return electronUpdaterSource();
+  }
+
+  const fakeSourceFile = unpackagedOverride("MEET_DESKTOP_UPDATES");
+
+  return fakeSourceFile ? fakeUpdateSource(fakeSourceFile) : undefined;
+}
+
+/**
+ * Holds off quitting until the Meeting Controller has restored the Integrations applied for a call. Returns a function
+ * that restores them straight away, after which quitting no longer waits.
+ */
+function restoreIntegrationsBeforeQuitting(meetingController: MeetingController): () => Promise<void> {
   let restored = false;
+
+  const restore = () =>
+    meetingController.quit().finally(() => {
+      restored = true;
+    });
 
   app.on("before-quit", (event) => {
     if (restored) {
@@ -132,9 +153,8 @@ function restoreIntegrationsBeforeQuitting(meetingController: MeetingController)
     }
 
     event.preventDefault();
-    void meetingController.quit().finally(() => {
-      restored = true;
-      app.quit();
-    });
+    void restore().finally(() => app.quit());
   });
+
+  return restore;
 }

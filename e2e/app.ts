@@ -98,6 +98,45 @@ export function shortcutsRun(userData: string): string[] {
 }
 
 /**
+ * Clicks the item with the given id in the app menu or the menu bar menu.
+ */
+export function clickMenuItem(app: ElectronApplication, menu: "app menu" | "menu bar", id: string): Promise<void> {
+  return app.evaluate(
+    ({ Menu }, { menu, id }) => {
+      const items = menu === "app menu" ? Menu.getApplicationMenu() : globalThis.menuBar?.menu;
+      items?.getMenuItemById(id)?.click();
+    },
+    { menu, id },
+  );
+}
+
+/**
+ * What the app asked in a message box.
+ */
+export type Question = { message: string; detail: string; buttons: string[] };
+
+/**
+ * Answers the next question the app asks with the button labelled `button`, or the first button if none is given,
+ * resolving to what it asked.
+ */
+export function answerNextQuestion(app: ElectronApplication, button?: string): Promise<Question> {
+  // A real dialog would block the test until someone answered it.
+  return app.evaluate(
+    ({ dialog }, button) =>
+      new Promise<Question>((resolve) => {
+        dialog.showMessageBox = async (...args: unknown[]) => {
+          const options = args.at(-1) as Electron.MessageBoxOptions;
+          const question = { message: options.message, detail: options.detail ?? "", buttons: options.buttons ?? [] };
+          resolve(question);
+
+          return { response: Math.max(question.buttons.indexOf(button ?? ""), 0), checkboxChecked: false };
+        };
+      }),
+    button,
+  );
+}
+
+/**
  * Calls `method` on the Meeting Window, Full or mini, whichever is showing the Meet page.
  */
 export function onMeetingWindow(app: ElectronApplication, method: "isVisible" | "hide" | "close"): Promise<unknown> {
