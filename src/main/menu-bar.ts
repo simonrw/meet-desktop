@@ -3,6 +3,7 @@ import { app, Menu, Tray, type MenuItemConstructorOptions } from "electron";
 import type { WindowOpeners } from "./app-menu";
 import type { MeetingController, MeetingState, PlainCommand } from "./meeting-controller";
 import { menuBarIconImage, type MenuBarIcon } from "./menu-bar-icons";
+import type { Updates } from "./updates";
 
 export interface MenuBar {
   readonly icon: MenuBarIcon;
@@ -11,11 +12,11 @@ export interface MenuBar {
 
 /**
  * Puts the menu bar item in place: its icon shows the Meeting State, and its menu shows Integration failures, sends
- * Commands to the Meeting Controller and opens the Join Prompt and settings.
+ * Commands to the Meeting Controller, opens the Join Prompt and settings, and restarts to install a downloaded Update.
  */
-export function startMenuBar(controller: MeetingController, openers: WindowOpeners): MenuBar {
+export function startMenuBar(controller: MeetingController, updates: Updates, openers: WindowOpeners): MenuBar {
   const send = (type: PlainCommand["type"]) => () => controller.command({ type });
-  const menuFor = () => buildMenu(controller.state, controller.integrationFailures, send, openers);
+  const menuFor = () => buildMenu(controller.state, controller.integrationFailures, updates, send, openers);
 
   let icon = iconFor(controller.state);
   let menu = menuFor();
@@ -31,10 +32,12 @@ export function startMenuBar(controller: MeetingController, openers: WindowOpene
     tray.setContextMenu(menu);
   });
 
-  controller.onIntegrationFailuresChange(() => {
+  const rebuildMenu = () => {
     menu = menuFor();
     tray.setContextMenu(menu);
-  });
+  };
+  controller.onIntegrationFailuresChange(rebuildMenu);
+  updates.onStateChange(rebuildMenu);
 
   return {
     get icon() {
@@ -58,6 +61,7 @@ function iconFor(state: MeetingState): MenuBarIcon {
 function buildMenu(
   state: MeetingState,
   integrationFailures: string[],
+  updates: Updates,
   send: (type: PlainCommand["type"]) => () => void,
   openers: WindowOpeners,
 ): Menu {
@@ -70,6 +74,19 @@ function buildMenu(
   if (failureItems.length > 0) {
     failureItems.push({ type: "separator" });
   }
+
+  const update = updates.state;
+  const updateItems: MenuItemConstructorOptions[] =
+    update.status === "ready"
+      ? [
+          {
+            id: "restart-to-update",
+            label: `Restart to Update (${update.version})`,
+            enabled: !inCall,
+            click: () => void updates.restartToUpdate(),
+          },
+        ]
+      : [];
 
   return Menu.buildFromTemplate([
     ...failureItems,
@@ -92,6 +109,7 @@ function buildMenu(
     { id: "join-meeting", label: "Join Meeting…", click: () => openers.openJoinPrompt() },
     { type: "separator" },
     { id: "settings", label: "Settings…", click: () => openers.openSettings() },
+    ...updateItems,
     { id: "quit", label: `Quit ${app.name}`, click: () => app.quit() },
   ]);
 }

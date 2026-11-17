@@ -30,6 +30,11 @@
     "directories": {
       "output": "release"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "simonrw",
+      "repo": "meet-desktop"
+    },
     "mac": {
       "category": "public.app-category.business",
       "extendInfo": {
@@ -52,5 +57,8 @@
     "electron-builder": "^26.18.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.12"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

@@ -13,6 +13,7 @@ import { createMeetingWindow } from "./meeting-window";
 import { startMenuBar, type MenuBar } from "./menu-bar";
 import { startSettings } from "./settings";
 import type { Settings } from "./settings-store";
+import { startUpdates } from "./updates";
 
 declare global {
   // Lets end-to-end tests read the Meeting State and send Commands. Set in unpackaged builds only.
@@ -97,7 +98,8 @@ if (!app.requestSingleInstanceLock()) {
     restoreIntegrationsBeforeQuitting(meetingController);
 
     setAppMenu(openers);
-    const menuBar = startMenuBar(meetingController, openers);
+    const updates = startUpdates(meetingController, unpackagedOverride("MEET_DESKTOP_UPDATES"));
+    const menuBar = startMenuBar(meetingController, updates, openers);
 
     openUrl = (url) => {
       const link = parseMeetingLink(url);
