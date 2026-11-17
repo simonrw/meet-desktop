@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
-import { launchApp, onMeetingWindow, startStubMeet } from "./app";
+import { answerNextQuestion, clickMenuItem, launchApp, onMeetingWindow, startStubMeet } from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
 let app: ElectronApplication;
@@ -40,15 +40,11 @@ async function openJoinPrompt(open: () => Promise<unknown>): Promise<Page> {
 }
 
 function fromMenuBar() {
-  return openJoinPrompt(() =>
-    app.evaluate(() => globalThis.menuBar?.menu.getMenuItemById("join-meeting")?.click()),
-  );
+  return openJoinPrompt(() => clickMenuItem(app, "menu bar", "join-meeting"));
 }
 
 function fromAppMenu() {
-  return openJoinPrompt(() =>
-    app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("join-meeting")?.click()),
-  );
+  return openJoinPrompt(() => clickMenuItem(app, "app menu", "join-meeting"));
 }
 
 async function press(prompt: Page, key: string) {
@@ -67,23 +63,6 @@ function meetingWindowVisible() {
 
 function windowCount() {
   return app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length);
-}
-
-/**
- * Answers the next question the app asks with the button at `response`.
- */
-function answerNextQuestion(response: number) {
-  // A real dialog would block the test until someone answered it.
-  return app.evaluate(
-    ({ dialog }, response) =>
-      new Promise<string>((resolve) => {
-        dialog.showMessageBox = async (_window: unknown, options?: { message: string }) => {
-          resolve(options?.message ?? "");
-          return { response, checkboxChecked: false };
-        };
-      }),
-    response,
-  );
 }
 
 async function joinCall() {
@@ -175,19 +154,19 @@ test("Escape closes the prompt without navigating", async () => {
 
 test("joining during a call asks first, and stays in the call when the user cancels", async () => {
   await joinCall();
-  const asked = answerNextQuestion(1);
+  const asked = answerNextQuestion(app, "Cancel");
   const prompt = await fromMenuBar();
 
   await join(prompt, "abc-defg-hij");
 
-  expect(await asked).toContain("abc-defg-hij");
+  expect((await asked).message).toContain("abc-defg-hij");
   await expect(page.getByRole("heading", { name: "In call" })).toBeVisible();
   await expect(page).toHaveURL(`${meet.origin}/`);
 });
 
 test("joining during a call switches meetings once the user confirms", async () => {
   await joinCall();
-  const asked = answerNextQuestion(0);
+  const asked = answerNextQuestion(app, "Leave and Join");
   const prompt = await fromMenuBar();
 
   await join(prompt, "abc-defg-hij");

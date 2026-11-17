@@ -176,6 +176,19 @@ describe("Meeting State", () => {
     expect(controller.state).toEqual({ status: "idle" });
   });
 
+  test("says the user is in a call only between entering and leaving it", () => {
+    const { controller } = setup();
+
+    controller.signal({ type: "entered-lobby" });
+    expect(controller.inCall).toBe(false);
+
+    controller.signal({ type: "entered-call" });
+    expect(controller.inCall).toBe(true);
+
+    controller.signal({ type: "left-call" });
+    expect(controller.inCall).toBe(false);
+  });
+
   test("reflects mute changes made inside Meet during a call", () => {
     const { controller } = setup();
     controller.signal({ type: "entered-call" });

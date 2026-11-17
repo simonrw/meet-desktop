@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import {
   app,
+  autoUpdater,
   BaseWindow,
   dialog,
   screen,
@@ -104,9 +105,12 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
   let openingMeeting = false;
   let quitting = false;
 
-  app.on("before-quit", () => {
+  const startQuitting = () => {
     quitting = true;
-  });
+  };
+  app.on("before-quit", startQuitting);
+  // Installing an Update closes the windows before "before-quit".
+  autoUpdater.on("before-quit-for-update", startQuitting);
 
   const meetView = new WebContentsView({
     webPreferences: { session: meetSession, sandbox: true, contextIsolation: true, preload: MEET_BRIDGE_PRELOAD },
