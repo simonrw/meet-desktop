@@ -1,10 +1,6 @@
-import { appendFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-
 import { app, dialog } from "electron";
 import { autoUpdater } from "electron-updater";
 
-import { isRecord, readJsonFile } from "./json-file";
 import type { MeetingController } from "./meeting-controller";
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -39,7 +35,7 @@ export interface Updates {
  * Where Updates come from: it looks for a newer Release, downloading it in the background, and installs the
  * downloaded one.
  */
-interface UpdateSource {
+export interface UpdateSource {
   /**
    * Looks for a newer Release, resolving to its version if there is one and rejecting when the check fails.
    */
@@ -57,14 +53,15 @@ interface UpdateSource {
 }
 
 /**
- * Looks for Updates at launch and every hour after, and keeps the Update state the menus show.
- *
- * Packaged builds get Updates from GitHub Releases. Unpackaged builds never look for them, unless given
- * `fakeSourceFile`, a JSON file naming the latest Release (see `fakeUpdateSource`).
+ * Looks for Updates from `source` at launch and every hour after, and keeps the Update state the menus show. Without a
+ * source, as in copies run with `npm start`, it never looks. Restarting to update calls `restoreIntegrations` before
+ * installing.
  */
-export function startUpdates(controller: MeetingController, fakeSourceFile: string | undefined): Updates {
-  const source = fakeSourceFile ? fakeUpdateSource(fakeSourceFile) : app.isPackaged ? electronUpdaterSource() : undefined;
-
+export function startUpdates(
+  controller: MeetingController,
+  restoreIntegrations: () => Promise<void>,
+  source: UpdateSource | undefined,
+): Updates {
   let state: UpdateState = { status: "none" };
   const listeners: ((state: UpdateState) => void)[] = [];
 
@@ -133,8 +130,9 @@ export function startUpdates(controller: MeetingController, fakeSourceFile: stri
         return;
       }
 
-      // Installing closes the windows before "before-quit", so the usual quit can't be relied on to restore them first.
-      await controller.quit();
+      // Installing closes the windows before "before-quit", so the usual quit can't be relied on to restore the
+      // Integrations first.
+      await restoreIntegrations();
       source.install();
     },
   };
@@ -149,7 +147,11 @@ async function tell(message: string, detail: string): Promise<void> {
   await dialog.showMessageBox({ message, detail, buttons: ["OK"] });
 }
 
-function electronUpdaterSource(): UpdateSource {
+/**
+ * Gets Updates from this repository's GitHub Releases through electron-updater, downloading them in the background and
+ * installing a downloaded one when the app quits.
+ */
+export function electronUpdaterSource(): UpdateSource {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
@@ -170,58 +172,4 @@ function electronUpdaterSource(): UpdateSource {
       autoUpdater.quitAndInstall();
     },
   };
-}
-
-/**
- * An update source for end-to-end tests. `file` holds the latest Release, `{ "version": "x.y.z" }`, or an error to
- * fail checks with, `{ "error": "message" }`. A newer version counts as downloaded straight away, and installing logs
- * its version to `installed-updates.log` next to `file` before quitting.
- */
-function fakeUpdateSource(file: string): UpdateSource {
-  const listeners: ((version: string) => void)[] = [];
-  let downloaded: string | undefined;
-
-  return {
-    async check() {
-      const latest = readJsonFile(file);
-      if (!isRecord(latest)) {
-        throw new Error(`Can't read the latest Release from ${file}`);
-      }
-
-      if (typeof latest.error === "string") {
-        throw new Error(latest.error);
-      }
-
-      if (typeof latest.version !== "string" || !isNewer(latest.version, app.getVersion())) {
-        return undefined;
-      }
-
-      downloaded = latest.version;
-      listeners.forEach((listener) => listener(latest.version as string));
-      return latest.version;
-    },
-
-    onDownloaded(listener) {
-      listeners.push(listener);
-    },
-
-    install() {
-      appendFileSync(join(dirname(file), "installed-updates.log"), `${downloaded}\n`);
-      app.quit();
-    },
-  };
-}
-
-function isNewer(version: string, than: string): boolean {
-  const parts = version.split(".").map(Number);
-  const thanParts = than.split(".").map(Number);
-
-  for (let i = 0; i < Math.max(parts.length, thanParts.length); i++) {
-    const difference = (parts[i] ?? 0) - (thanParts[i] ?? 0);
-    if (difference !== 0) {
-      return difference > 0;
-    }
-  }
-
-  return false;
 }
