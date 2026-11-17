@@ -140,3 +140,99 @@ test("without the override, the app never checks for Updates", async () => {
   await expect.poll(menuBarIds).toContain("quit");
   expect(logs).not.toContain("Checking for Updates");
 });
+
+type Question = { message: string; detail: string; buttons: string[] };
+
+/**
+ * Answers the next question the app asks with the button labelled `button`, or the first button if none is given,
+ * resolving to what it asked.
+ */
+function answerNextQuestion(button?: string) {
+  // A real dialog would block the test until someone answered it.
+  return app.evaluate(
+    ({ dialog }, button) =>
+      new Promise<Question>((resolve) => {
+        dialog.showMessageBox = async (...args: unknown[]) => {
+          const options = args.at(-1) as Electron.MessageBoxOptions;
+          const question = { message: options.message, detail: options.detail ?? "", buttons: options.buttons ?? [] };
+          resolve(question);
+
+          return { response: Math.max(question.buttons.indexOf(button ?? ""), 0), checkboxChecked: false };
+        };
+      }),
+    button,
+  );
+}
+
+function checkForUpdates() {
+  return app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById("check-for-updates")?.click());
+}
+
+test("checking for Updates with nothing newer reports the running version is the latest", async () => {
+  await launch({ version: runningVersion });
+  const asked = answerNextQuestion();
+
+  await checkForUpdates();
+
+  expect(await asked).toEqual({ message: "You're on the latest version", detail: `Meet ${runningVersion}`, buttons: ["OK"] });
+});
+
+test("checking for Updates finds a Release published since launch and offers to restart to update to it", async () => {
+  await launch({ version: runningVersion });
+  await expect.poll(() => logs).toContain("Checking for Updates");
+  writeFileSync(join(userData, "latest-release.json"), JSON.stringify({ version: "99.0.0" }));
+  const asked = answerNextQuestion("Later");
+
+  await checkForUpdates();
+
+  expect(await asked).toMatchObject({ message: "Meet 99.0.0 is ready to install" });
+  await expect.poll(restartItem).toEqual({ label: "Restart to Update (99.0.0)", enabled: true });
+});
+
+test("restarting from the check for Updates dialog installs the Update", async () => {
+  await launch({ version: "99.0.0" });
+  await expect.poll(restartItem).toMatchObject({ enabled: true });
+  const asked = answerNextQuestion("Restart");
+  const closed = app.waitForEvent("close");
+
+  await checkForUpdates();
+
+  expect((await asked).buttons).toEqual(["Restart", "Later"]);
+  await closed;
+  expect(updatesInstalled(userData)).toEqual(["99.0.0"]);
+});
+
+test("during a call, the check for Updates dialog doesn't offer to restart", async () => {
+  await launch({ version: "99.0.0" });
+  await expect.poll(restartItem).toMatchObject({ enabled: true });
+  await joinCall();
+  const asked = answerNextQuestion();
+
+  await checkForUpdates();
+
+  expect(await asked).toMatchObject({ message: "Meet 99.0.0 is ready to install", buttons: ["OK"] });
+  expect(await meetingState()).toBe("in-call");
+  expect(updatesInstalled(userData)).toEqual([]);
+});
+
+test("a failed check for Updates says why", async () => {
+  await launch({ error: "The Release feed is unreachable" });
+  const asked = answerNextQuestion();
+
+  await checkForUpdates();
+
+  expect(await asked).toEqual({
+    message: "Couldn't check for Updates",
+    detail: "The Release feed is unreachable",
+    buttons: ["OK"],
+  });
+});
+
+test("without the override, checking for Updates says this copy never updates", async () => {
+  await launch();
+  const asked = answerNextQuestion();
+
+  await checkForUpdates();
+
+  expect(await asked).toMatchObject({ message: "Couldn't check for Updates", detail: "Copies run with npm start never update." });
+});

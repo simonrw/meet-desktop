@@ -1,7 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { app } from "electron";
+import { app, dialog } from "electron";
 import { autoUpdater } from "electron-updater";
 
 import { isRecord, readJsonFile } from "./json-file";
@@ -23,6 +23,12 @@ export interface Updates {
   onStateChange(listener: (state: UpdateState) => void): void;
 
   /**
+   * Looks for a newer Release now and shows a dialog with what it found, offering to restart to update when one is
+   * ready and there's no call.
+   */
+  checkForUpdates(): Promise<void>;
+
+  /**
    * Restores the applied Integrations and installs the downloaded Update, relaunching the app on the new version. Does
    * nothing during a call.
    */
@@ -35,9 +41,9 @@ export interface Updates {
  */
 interface UpdateSource {
   /**
-   * Looks for a newer Release, rejecting when the check fails.
+   * Looks for a newer Release, resolving to its version if there is one and rejecting when the check fails.
    */
-  check(): Promise<void>;
+  check(): Promise<string | undefined>;
 
   /**
    * Calls `listener` with the version of each Update once it has downloaded.
@@ -80,13 +86,46 @@ export function startUpdates(controller: MeetingController, fakeSourceFile: stri
     setInterval(check, CHECK_INTERVAL_MS);
   }
 
-  return {
+  const updates: Updates = {
     get state() {
       return state;
     },
 
     onStateChange(listener) {
       listeners.push(listener);
+    },
+
+    async checkForUpdates() {
+      let found: string | undefined;
+      try {
+        if (source === undefined) {
+          throw new Error("Copies run with npm start never update.");
+        }
+
+        found = await source.check();
+      } catch (error) {
+        await tell("Couldn't check for Updates", error instanceof Error ? error.message : String(error));
+        return;
+      }
+
+      if (found !== undefined && !(state.status === "ready" && state.version === found)) {
+        await tell(`Downloading ${app.name} ${found}`, '"Restart to Update" appears in the menu bar once it has downloaded.');
+      } else if (state.status !== "ready") {
+        await tell("You're on the latest version", `${app.name} ${app.getVersion()}`);
+      } else if (controller.state.status === "in-call") {
+        await tell(`${app.name} ${state.version} is ready to install`, "You can restart to update once you leave the call.");
+      } else {
+        const { response } = await dialog.showMessageBox({
+          message: `${app.name} ${state.version} is ready to install`,
+          detail: "Restart now to install it?",
+          buttons: ["Restart", "Later"],
+          defaultId: 0,
+          cancelId: 1,
+        });
+        if (response === 0) {
+          await updates.restartToUpdate();
+        }
+      }
     },
 
     async restartToUpdate() {
@@ -99,6 +138,15 @@ export function startUpdates(controller: MeetingController, fakeSourceFile: stri
       source.install();
     },
   };
+
+  return updates;
+}
+
+/**
+ * Shows `message` with `detail` in a dialog with an OK button.
+ */
+async function tell(message: string, detail: string): Promise<void> {
+  await dialog.showMessageBox({ message, detail, buttons: ["OK"] });
 }
 
 function electronUpdaterSource(): UpdateSource {
@@ -110,7 +158,8 @@ function electronUpdaterSource(): UpdateSource {
 
   return {
     async check() {
-      await autoUpdater.checkForUpdates();
+      const result = await autoUpdater.checkForUpdates();
+      return result?.isUpdateAvailable ? result.updateInfo.version : undefined;
     },
 
     onDownloaded(listener) {
@@ -143,10 +192,13 @@ function fakeUpdateSource(file: string): UpdateSource {
         throw new Error(latest.error);
       }
 
-      if (typeof latest.version === "string" && isNewer(latest.version, app.getVersion())) {
-        downloaded = latest.version;
-        listeners.forEach((listener) => listener(latest.version as string));
+      if (typeof latest.version !== "string" || !isNewer(latest.version, app.getVersion())) {
+        return undefined;
       }
+
+      downloaded = latest.version;
+      listeners.forEach((listener) => listener(latest.version as string));
+      return latest.version;
     },
 
     onDownloaded(listener) {
