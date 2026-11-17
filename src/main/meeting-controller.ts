@@ -6,6 +6,7 @@ import {
   type Integration,
   type IntegrationLedgerPort,
 } from "./integration-lifecycle";
+import type { MeetingLink } from "./meeting-link";
 
 export type MeetingState =
   | { status: "idle" }
@@ -34,7 +35,7 @@ export type PlainCommand = {
     | "toggle-mini-mode";
 };
 
-export type Command = PlainCommand | { type: "join-meeting"; code: string };
+export type Command = PlainCommand | { type: "join-meeting"; link: MeetingLink };
 
 export type Presentation = "full" | "mini";
 
@@ -46,14 +47,24 @@ export interface MeetBridgePort {
 }
 
 export interface MeetingWindowPort {
+  readonly presentation: Presentation;
+
   show(): void;
+
+  /**
+   * Hides the Meeting Window, which shows Full when it next appears.
+   */
   hide(): void;
+
+  /**
+   * Switches the Meeting Window to the given presentation, bringing it forward without taking the keyboard.
+   */
   setPresentation(presentation: Presentation): void;
 
   /**
-   * Opens the pre-join screen of the meeting with the given code and brings the window to the front.
+   * Opens the meeting's pre-join screen and brings the window to the front.
    */
-  openMeeting(code: string): void;
+  openMeeting(link: MeetingLink): void;
 
   /**
    * Asks the user whether to leave the call, resolving to true if they agree.
@@ -61,9 +72,9 @@ export interface MeetingWindowPort {
   confirmLeave(): Promise<boolean>;
 
   /**
-   * Asks the user whether to leave the call to join the meeting with the given code, resolving to true if they agree.
+   * Asks the user whether to leave the call to join the given meeting, resolving to true if they agree.
    */
-  confirmSwitch(code: string): Promise<boolean>;
+  confirmSwitch(link: MeetingLink): Promise<boolean>;
 }
 
 export interface MeetingController {
@@ -123,7 +134,6 @@ export function createMeetingController({
   let cameraOn = true;
   let handRaised = false;
   let confirming = false;
-  let presentation: Presentation = "full";
   const listeners: Array<(state: MeetingState) => void> = [];
 
   const integrationLifecycle = startIntegrationLifecycle({ integrations, ledger, clock });
@@ -159,15 +169,10 @@ export function createMeetingController({
     return confirmed;
   }
 
-  async function joinMeeting(code: string): Promise<void> {
-    if (status !== "in-call" || (await confirm(() => meetingWindow.confirmSwitch(code)))) {
-      meetingWindow.openMeeting(code);
+  async function joinMeeting(link: MeetingLink): Promise<void> {
+    if (status !== "in-call" || (await confirm(() => meetingWindow.confirmSwitch(link)))) {
+      meetingWindow.openMeeting(link);
     }
-  }
-
-  function present(next: Presentation): void {
-    presentation = next;
-    meetingWindow.setPresentation(next);
   }
 
   async function closeWindow(): Promise<void> {
@@ -207,8 +212,8 @@ export function createMeetingController({
           break;
 
         case "left-call":
-          if (status === "in-call" && presentation === "mini") {
-            present("full");
+          if (status === "in-call" && meetingWindow.presentation === "mini") {
+            meetingWindow.setPresentation("full");
           }
 
           integrationLifecycle.leftCall();
@@ -248,14 +253,14 @@ export function createMeetingController({
           return;
 
         case "join-meeting":
-          void joinMeeting(command.code);
+          void joinMeeting(command.link);
           return;
 
         case "toggle-mini-mode":
-          if (presentation === "full") {
-            present("mini");
+          if (meetingWindow.presentation === "full") {
+            meetingWindow.setPresentation("mini");
           } else {
-            present("full");
+            meetingWindow.setPresentation("full");
             meetingWindow.show();
           }
           return;
@@ -285,8 +290,8 @@ export function createMeetingController({
     },
 
     switchedAway() {
-      if (status === "in-call" && presentation === "full" && autoMiniMode()) {
-        present("mini");
+      if (status === "in-call" && meetingWindow.presentation === "full" && autoMiniMode()) {
+        meetingWindow.setPresentation("mini");
       }
     },
 

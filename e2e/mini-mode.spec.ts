@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
-import { launchApp, newUserData, startStubMeet } from "./app";
+import { launchApp, newUserData, onMeetingWindow, startStubMeet } from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
 let userData: string;
@@ -99,6 +99,13 @@ async function joinCall() {
   await expect.poll(() => app.evaluate(() => globalThis.meetingController?.state.status)).toBe("in-call");
 }
 
+function agreeToEveryQuestion() {
+  // A real dialog would block the test until someone answered it.
+  return app.evaluate(({ dialog }) => {
+    dialog.showMessageBox = async () => ({ response: 0, checkboxChecked: false });
+  });
+}
+
 function switchToAnotherApp() {
   return app.evaluate(({ app }) => app.emit("did-resign-active"));
 }
@@ -178,6 +185,20 @@ test("the window returns to Full when the call ends in Mini Mode", async () => {
 
   await page.getByRole("button", { name: "Leave call" }).click();
 
+  await expectPresentation(FULL);
+});
+
+test("closing the mini window during a call leaves the call and keeps the window hidden until shown", async () => {
+  await joinCall();
+  await toggleMiniMode(MINI);
+  await agreeToEveryQuestion();
+
+  await onMeetingWindow(app, "close");
+
+  await expect.poll(() => app.evaluate(() => globalThis.meetingController?.state.status)).toBe("idle");
+  expect(await shownWindows()).toEqual([]);
+
+  await clickMenuBarItem("show-window");
   await expectPresentation(FULL);
 });
 

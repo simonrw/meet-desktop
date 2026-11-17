@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { app, BrowserWindow, clipboard } from "electron";
 
 import type { Command } from "./meeting-controller";
-import { parseMeetingCode } from "./meeting-link";
+import { parseMeetingLink } from "./meeting-link";
 
 export type PrefillChannel = "join-prompt:prefill";
 export type JoinChannel = "join-prompt:join";
@@ -61,13 +61,13 @@ export function startJoinPrompt(onCommand: (command: Command) => void): JoinProm
   let window: BrowserWindow | undefined;
 
   const attemptJoin = (input: string): JoinResult => {
-    const code = parseMeetingCode(input);
-    if (code === undefined) {
+    const link = parseMeetingLink(input);
+    if (link === undefined) {
       return { error: INVALID_INPUT };
     }
 
     window?.close();
-    onCommand({ type: "join-meeting", code });
+    onCommand({ type: "join-meeting", link });
 
     return undefined;
   };
@@ -95,7 +95,10 @@ export function startJoinPrompt(onCommand: (command: Command) => void): JoinProm
       });
 
       const prompt = window;
-      prompt.webContents.ipc.handle(PREFILL_CHANNEL, async () => parseMeetingCode(await clipboard.readText()) ?? "");
+      prompt.webContents.ipc.handle(PREFILL_CHANNEL, async () => {
+        const text = (await clipboard.readText()).trim();
+        return parseMeetingLink(text) !== undefined ? text : "";
+      });
       prompt.webContents.ipc.handle(JOIN_CHANNEL, (_event, input: string) => attemptJoin(input));
       prompt.webContents.ipc.on(CLOSE_CHANNEL, () => prompt.close());
 

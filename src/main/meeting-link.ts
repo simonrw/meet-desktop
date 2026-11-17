@@ -3,34 +3,60 @@
  */
 export const URL_SCHEME = "meet-desktop";
 
+/**
+ * A meeting to open: its Meeting Code, as `abc-defg-hij`, and the Google account to open it under, when a Meet link
+ * picked one.
+ */
+export interface MeetingLink {
+  code: string;
+  authuser?: string;
+}
+
 const MEET_HOST = "meet.google.com";
 const CODE = /^([a-z]{3})-?([a-z]{4})-?([a-z]{3})$/i;
 
 /**
- * Reads the meeting code, as `abc-defg-hij`, from a bare meeting code, a Meet link or a URL in the app's own scheme.
- * Returns `undefined` for anything else.
+ * Reads the meeting from a bare Meeting Code, a Meet link or a URL in the app's own scheme. Returns `undefined` for
+ * anything else.
  */
-export function parseMeetingCode(input: string): string | undefined {
+export function parseMeetingLink(input: string): MeetingLink | undefined {
   const text = input.trim();
+  const code = normalisedCode(text);
 
-  return normalisedCode(text) ?? codeFromUrl(text);
+  return code !== undefined ? { code } : linkFromUrl(text);
 }
 
-function codeFromUrl(text: string): string | undefined {
+/**
+ * Returns the URL of the meeting's page on the given Meet origin.
+ */
+export function meetingUrl(link: MeetingLink, meetOrigin: string): string {
+  const url = new URL(link.code, meetOrigin);
+  if (link.authuser !== undefined) {
+    url.searchParams.set("authuser", link.authuser);
+  }
+
+  return url.href;
+}
+
+function linkFromUrl(text: string): MeetingLink | undefined {
   const url = parseUrl(text) ?? parseUrl(`https://${text}`);
   if (url === undefined) {
     return undefined;
   }
 
+  let code: string | undefined;
   if (url.protocol === `${URL_SCHEME}:`) {
-    return normalisedCode(url.host + url.pathname.replace(/\/$/, ""));
+    code = normalisedCode(url.host + url.pathname.replace(/\/$/, ""));
+  } else if ((url.protocol === "https:" || url.protocol === "http:") && url.host === MEET_HOST) {
+    code = normalisedCode(url.pathname.replace(/^\//, "").replace(/\/$/, ""));
   }
 
-  if ((url.protocol === "https:" || url.protocol === "http:") && url.host === MEET_HOST) {
-    return normalisedCode(url.pathname.replace(/^\//, "").replace(/\/$/, ""));
+  if (code === undefined) {
+    return undefined;
   }
 
-  return undefined;
+  const authuser = url.searchParams.get("authuser");
+  return authuser === null ? { code } : { code, authuser };
 }
 
 function normalisedCode(text: string): string | undefined {

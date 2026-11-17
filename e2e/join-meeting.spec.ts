@@ -117,12 +117,12 @@ test("a meeting code opens that meeting's pre-join screen and closes the prompt"
   await expect.poll(windowCount).toBe(1);
 });
 
-test("a Meet link opens that meeting's pre-join screen", async () => {
+test("a Meet link opens that meeting's pre-join screen under the Google account it picks", async () => {
   const prompt = await fromMenuBar();
 
-  await join(prompt, "https://meet.google.com/abc-defg-hij?authuser=1");
+  await join(prompt, "https://meet.google.com/abc-defg-hij?authuser=1&hs=122");
 
-  await expect(page).toHaveURL(`${meet.origin}/abc-defg-hij`);
+  await expect(page).toHaveURL(`${meet.origin}/abc-defg-hij?authuser=1`);
 });
 
 test("joining brings back a hidden Meeting Window", async () => {
@@ -135,13 +135,15 @@ test("joining brings back a hidden Meeting Window", async () => {
 });
 
 test("a Meet link on the clipboard is prefilled so that Return joins it", async () => {
-  await onClipboard("https://meet.google.com/abc-defg-hij");
+  await onClipboard(" https://meet.google.com/abc-defg-hij?authuser=1\n");
 
   const prompt = await fromMenuBar();
-  await expect(prompt.getByRole("textbox", { name: "Meet link or code" })).toHaveValue("abc-defg-hij");
+  await expect(prompt.getByRole("textbox", { name: "Meet link or code" })).toHaveValue(
+    "https://meet.google.com/abc-defg-hij?authuser=1",
+  );
 
   await press(prompt, "Enter");
-  await expect(page).toHaveURL(`${meet.origin}/abc-defg-hij`);
+  await expect(page).toHaveURL(`${meet.origin}/abc-defg-hij?authuser=1`);
 });
 
 test("anything else on the clipboard is ignored", async () => {
@@ -193,6 +195,34 @@ test("joining during a call switches meetings once the user confirms", async () 
   await asked;
   await expect(page).toHaveURL(`${meet.origin}/abc-defg-hij`);
   await expect(page.getByRole("heading", { name: "Ready to join?" })).toBeVisible();
+});
+
+test("during a call, the Meet page can't navigate away without the user confirming", async () => {
+  await joinCall();
+  const askedToLeave = app.evaluate(
+    ({ webContents }) =>
+      new Promise<void>((resolve) => {
+        const meetPage = webContents.getAllWebContents().find((contents) => contents.getTitle() === "Stub Meet");
+        meetPage?.once("will-prevent-unload", () => resolve());
+      }),
+  );
+
+  await page.evaluate((url) => location.assign(url), `${meet.origin}/abc-defg-hij`);
+  await askedToLeave;
+
+  // Gives a navigation that went ahead time to replace the page.
+  await page.waitForTimeout(500);
+
+  // Playwright waits forever on a navigation that was refused, so the page is read from the main process.
+  const shown = await app.evaluate(async ({ webContents }) => {
+    const meetPage = webContents.getAllWebContents().find((contents) => contents.getTitle() === "Stub Meet");
+
+    return {
+      url: meetPage?.getURL(),
+      heading: await meetPage?.executeJavaScript("document.querySelector('h1').textContent"),
+    };
+  });
+  expect(shown).toEqual({ url: `${meet.origin}/`, heading: "In call" });
 });
 
 test("opening a meet-desktop URL opens the meeting in a hidden Meeting Window", async () => {

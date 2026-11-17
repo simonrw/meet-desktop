@@ -1,10 +1,13 @@
 import { describe, expect, test } from "vitest";
 
 import type { Integration, LedgerEntries } from "./integration-lifecycle";
-import { createMeetingController, type PlainCommand } from "./meeting-controller";
+import { createMeetingController, type PlainCommand, type Presentation } from "./meeting-controller";
 
 interface FakeIntegrationOptions {
   enabled?: boolean;
+
+  /** Leaves `apply` running for good, as a Shortcut that never finishes would. */
+  hangApply?: boolean;
   failApply?: string;
   failRestore?: string;
 }
@@ -26,6 +29,7 @@ function setup({
 
   const ledger = { entries: ledgerEntries };
   const clock = fakeClock();
+  let presentation: Presentation = "full";
 
   const integrations = Object.entries(integrationOptions).map(([id, options]): Integration => ({
     id,
@@ -34,6 +38,10 @@ function setup({
 
     async apply() {
       integrationActions.push(`${id}:apply`);
+      if (options.hangApply) {
+        await new Promise(() => {});
+      }
+
       if (options.failApply) {
         throw new Error(options.failApply);
       }
@@ -57,10 +65,19 @@ function setup({
       leaveCall: () => bridgeActions.push("leave-call"),
     },
     meetingWindow: {
+      get presentation() {
+        return presentation;
+      },
       show: () => windowActions.push("show"),
-      hide: () => windowActions.push("hide"),
-      setPresentation: (presentation) => windowActions.push(presentation),
-      openMeeting: (code) => windowActions.push(`open ${code}`),
+      hide: () => {
+        presentation = "full";
+        windowActions.push("hide");
+      },
+      setPresentation: (next) => {
+        presentation = next;
+        windowActions.push(next);
+      },
+      openMeeting: (link) => windowActions.push(`open ${link.code}`),
       confirmLeave: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
       confirmSwitch: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
     },
@@ -436,6 +453,18 @@ describe("close window Command", () => {
     expect(windowActions).toEqual([]);
   });
 
+  test("in Mini Mode leaves the hidden Meeting Window alone when the call ends", async () => {
+    const { controller, windowActions, answerConfirmation } = setup();
+    controller.signal({ type: "entered-call" });
+    controller.command({ type: "toggle-mini-mode" });
+
+    controller.command({ type: "close-window" });
+    await answerConfirmation(true);
+    controller.signal({ type: "left-call" });
+
+    expect(windowActions).toEqual(["mini", "hide"]);
+  });
+
   test("still hides the Meeting Window when the call ended while the question was on screen", async () => {
     const { controller, bridgeActions, windowActions, answerConfirmation } = setup();
     controller.signal({ type: "entered-call" });
@@ -507,7 +536,7 @@ describe("Integrations", () => {
     controller.signal({ type: "entered-call" });
     await settle();
 
-    controller.command({ type: "join-meeting", code: "abc-defg-hij" });
+    controller.command({ type: "join-meeting", link: { code: "abc-defg-hij" } });
     await answerConfirmation(true);
     controller.signal({ type: "left-call" });
     controller.signal({ type: "entered-lobby" });
@@ -608,7 +637,7 @@ describe("Integration failures", () => {
 
     expect(controller.state).toEqual(inCall());
     expect(integrationActions).toEqual(["focus:apply", "slack:apply"]);
-    expect(ledger.entries).toEqual({ slack: { appliedBy: "slack" } });
+    expect(ledger.entries).toEqual({ focus: null, slack: { appliedBy: "slack" } });
 
     expect(controller.integrationFailures).toEqual(["focus wasn't turned on: Shortcut not found"]);
   });
@@ -650,6 +679,30 @@ describe("Integration failures", () => {
 });
 
 describe("Integration Ledger", () => {
+  test("lists an Integration while its apply is still running, so a crash part way through restores it", async () => {
+    const { controller, ledger } = setup({ integrations: { focus: { hangApply: true } } });
+
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    expect(ledger.entries).toEqual({ focus: null });
+  });
+
+  test("keeps an Integration whose apply failed, and restores it once the call is over", async () => {
+    const { controller, clock, integrationActions, ledger } = setup({
+      integrations: { focus: { failApply: "Shortcut timed out" } },
+    });
+    controller.signal({ type: "entered-call" });
+    await settle();
+    expect(ledger.entries).toEqual({ focus: null });
+
+    controller.signal({ type: "left-call" });
+    await clock.advance(30_000);
+
+    expect(integrationActions).toEqual(["focus:apply", "focus:restore null"]);
+    expect(ledger.entries).toEqual({});
+  });
+
   test("entries left by a crash mid-call are restored on startup, even for Integrations since turned off", async () => {
     const { integrationActions, ledger } = setup({
       integrations: { focus: { enabled: false }, slack: {} },
@@ -673,7 +726,7 @@ describe("Integration Ledger", () => {
 });
 
 describe("join meeting Command", () => {
-  const join = { type: "join-meeting", code: "abc-defg-hij" } as const;
+  const join = { type: "join-meeting", link: { code: "abc-defg-hij" } } as const;
 
   test("opens the meeting without asking outside a call", () => {
     const { controller, windowActions, pendingConfirmations } = setup();

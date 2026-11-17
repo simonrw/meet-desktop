@@ -16,6 +16,7 @@ import {
 
 import { MEET_BRIDGE_PRELOAD } from "./meet-bridge";
 import type { Command, MeetingWindowPort, Presentation } from "./meeting-controller";
+import { meetingUrl } from "./meeting-link";
 import { isInAppUrl, isMeetUrl } from "./navigation-policy";
 import { shareScreenOnRequest } from "./screen-share";
 import { loadBounds, saveBounds, type Rectangle } from "./window-bounds";
@@ -100,6 +101,12 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
   let presentation: Presentation = "full";
   let miniOpacity = 1;
   let mini: MiniWindow | undefined;
+  let openingMeeting = false;
+  let quitting = false;
+
+  app.on("before-quit", () => {
+    quitting = true;
+  });
 
   const meetView = new WebContentsView({
     webPreferences: { session: meetSession, sandbox: true, contextIsolation: true, preload: MEET_BRIDGE_PRELOAD },
@@ -115,12 +122,20 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
   const shown = () => (presentation === "mini" && mini ? mini.window : full);
 
   configureSession(meetSession, meetOrigin, shown);
-  routeNavigation(meetView.webContents, meetOrigin);
+  routeNavigation(meetView.webContents, meetOrigin, () => openingMeeting || quitting);
   meetView.webContents.on("page-title-updated", (_event, title) => full.setTitle(title));
 
   const saveFullBounds = rememberBounds(full, join(userData, "window-bounds.json"));
-  const onClose = () => onCommand({ type: "close-window" });
-  interceptClose(full, onClose);
+
+  const interceptClose = (window: BaseWindow) => {
+    window.on("close", (event) => {
+      if (!quitting) {
+        event.preventDefault();
+        onCommand({ type: "close-window" });
+      }
+    });
+  };
+  interceptClose(full);
 
   // Unlike a BrowserWindow's page, a view's page outlives its window, and one still loading holds up quitting.
   full.once("closed", () => meetView.webContents.close());
@@ -132,7 +147,7 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
       mini = createMiniWindow(join(userData, "mini-window-bounds.json"), miniOpacity, () =>
         onCommand({ type: "toggle-mini-mode" }),
       );
-      interceptClose(mini.window, onClose);
+      interceptClose(mini.window);
     }
 
     saveFullBounds();
@@ -146,19 +161,12 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
     full.hide();
   };
 
-  const enterFull = () => {
-    if (!mini) {
-      return;
-    }
-
+  const moveToFull = (mini: MiniWindow) => {
     mini.saveBounds();
 
     meetView.removeChildView(mini.handle);
     mini.window.setContentView(new View());
     full.setContentView(meetView);
-
-    full.showInactive();
-    mini.window.hide();
   };
 
   const show = () => {
@@ -173,8 +181,23 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
 
   return {
     webContents: meetView.webContents,
+
+    get presentation() {
+      return presentation;
+    },
+
     show,
-    hide: () => hide(shown()),
+
+    hide() {
+      if (presentation === "mini" && mini) {
+        moveToFull(mini);
+        mini.window.hide();
+      }
+
+      presentation = "full";
+      leaveFullScreen(full, () => full.hide());
+    },
+
     keepOnTop: (onTop) => full.setAlwaysOnTop(onTop, "floating"),
 
     setPresentation(next) {
@@ -183,14 +206,12 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
       }
 
       presentation = next;
-      if (next === "full") {
-        enterFull();
-      } else if (full.isFullScreen()) {
-        // Hiding a full-screen window leaves an empty black Space behind.
-        full.once("leave-full-screen", () => presentation === "mini" && enterMini());
-        full.setFullScreen(false);
-      } else {
-        enterMini();
+      if (next === "mini") {
+        leaveFullScreen(full, () => presentation === "mini" && enterMini());
+      } else if (mini) {
+        moveToFull(mini);
+        full.showInactive();
+        mini.window.hide();
       }
     },
 
@@ -199,13 +220,16 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
       mini?.window.setOpacity(opacity);
     },
 
-    openMeeting(code) {
-      meetView.webContents.loadURL(new URL(code, meetOrigin).href);
+    openMeeting(link) {
+      openingMeeting = true;
+      void meetView.webContents.loadURL(meetingUrl(link, meetOrigin)).finally(() => {
+        openingMeeting = false;
+      });
       show();
     },
 
     confirmLeave: () => confirmLeave(shown(), show, "Leave the call?", "Leave"),
-    confirmSwitch: (code) => confirmLeave(shown(), show, `Leave the call and join ${code}?`, "Leave and Join"),
+    confirmSwitch: (link) => confirmLeave(shown(), show, `Leave the call and join ${link.code}?`, "Leave and Join"),
   };
 }
 
@@ -327,7 +351,11 @@ async function askMacOSForMedia(mediaTypes: Array<"video" | "audio">): Promise<b
   return true;
 }
 
-function routeNavigation(contents: WebContents, meetOrigin: string): void {
+/**
+ * Keeps Meet's own pages in the window and opens other links in the browser. The page may only be left despite its
+ * "leave site?" prompt while `mayLeavePage` returns true.
+ */
+function routeNavigation(contents: WebContents, meetOrigin: string, mayLeavePage: () => boolean): void {
   contents.setWindowOpenHandler(({ url }) => {
     if (isInAppUrl(url, meetOrigin)) {
       contents.loadURL(url);
@@ -339,8 +367,12 @@ function routeNavigation(contents: WebContents, meetOrigin: string): void {
   });
 
   // Electron turns a page's "leave site?" prompt into a silent refusal, which would stop a confirmed switch to another
-  // meeting.
-  contents.on("will-prevent-unload", (event) => event.preventDefault());
+  // meeting or quitting.
+  contents.on("will-prevent-unload", (event) => {
+    if (mayLeavePage()) {
+      event.preventDefault();
+    }
+  });
 
   contents.on("will-navigate", (event) => {
     // Only links clicked inside Meet are policed: sign-in flows (including Workspace SSO providers) hop across
@@ -373,28 +405,15 @@ function rememberBounds(window: BaseWindow, boundsFile: string): () => void {
   return save;
 }
 
-let quitting = false;
-app.on("before-quit", () => {
-  quitting = true;
-});
-
-function interceptClose(window: BaseWindow, onCloseRequested: () => void): void {
-  window.on("close", (event) => {
-    if (quitting) {
-      return;
-    }
-
-    event.preventDefault();
-    onCloseRequested();
-  });
-}
-
-function hide(window: BaseWindow): void {
+/**
+ * Takes the window out of full screen, if it's in it, and then calls `then`.
+ */
+function leaveFullScreen(window: BaseWindow, then: () => void): void {
   // Hiding a full-screen window leaves an empty black Space behind.
   if (window.isFullScreen()) {
-    window.once("leave-full-screen", () => window.hide());
+    window.once("leave-full-screen", then);
     window.setFullScreen(false);
   } else {
-    window.hide();
+    then();
   }
 }

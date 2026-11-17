@@ -23,6 +23,9 @@ export interface Integration {
    */
   apply(): Promise<RestoreState>;
 
+  /**
+   * Undoes the side effect. `saved` is `null` when the apply never finished, so the state to return to isn't known.
+   */
   restore(saved: RestoreState): Promise<void>;
 }
 
@@ -118,12 +121,16 @@ export function startIntegrationLifecycle({
     applied = true;
 
     for (const integration of integrations.filter((integration) => integration.enabled)) {
-      enqueue(integration, () =>
-        attempt(integration, "on", async () => {
+      enqueue(integration, () => {
+        // Listed before applying, since a crash or a failure part way through may still leave it applied.
+        entries[integration.id] ??= null;
+        ledger.write({ ...entries });
+
+        return attempt(integration, "on", async () => {
           entries[integration.id] = await integration.apply();
           ledger.write({ ...entries });
-        }),
-      );
+        });
+      });
     }
   };
 

@@ -8,7 +8,7 @@ import { fileLedger } from "./integration-ledger";
 import { startJoinPrompt } from "./join-prompt";
 import { connectMeetBridge } from "./meet-bridge";
 import { createMeetingController, type Command, type MeetingController } from "./meeting-controller";
-import { parseMeetingCode, URL_SCHEME } from "./meeting-link";
+import { parseMeetingLink, URL_SCHEME } from "./meeting-link";
 import { createMeetingWindow } from "./meeting-window";
 import { startMenuBar, type MenuBar } from "./menu-bar";
 import { startSettings } from "./settings";
@@ -99,9 +99,9 @@ if (!app.requestSingleInstanceLock()) {
     const menuBar = startMenuBar(meetingController, windows);
 
     openUrl = (url) => {
-      const code = parseMeetingCode(url);
-      if (code !== undefined) {
-        sendCommand({ type: "join-meeting", code });
+      const link = parseMeetingLink(url);
+      if (link !== undefined) {
+        sendCommand({ type: "join-meeting", link });
       }
     };
     earlyUrls.forEach(openUrl);
