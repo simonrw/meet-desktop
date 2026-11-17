@@ -65,9 +65,11 @@ export function startUpdates(
   let state: UpdateState = { status: "none" };
   const listeners: ((state: UpdateState) => void)[] = [];
 
+  const isReady = (version: string) => state.status === "ready" && state.version === version;
+
   if (source !== undefined) {
     source.onDownloaded((version) => {
-      if (state.status === "ready" && state.version === version) {
+      if (isReady(version)) {
         return;
       }
 
@@ -79,6 +81,7 @@ export function startUpdates(
       console.log("Checking for Updates");
       source.check().catch((error) => console.error("Checking for Updates failed:", error));
     };
+
     check();
     setInterval(check, CHECK_INTERVAL_MS);
   }
@@ -94,6 +97,7 @@ export function startUpdates(
 
     async checkForUpdates() {
       let found: string | undefined;
+
       try {
         if (source === undefined) {
           throw new Error("Copies run with npm start never update.");
@@ -105,11 +109,11 @@ export function startUpdates(
         return;
       }
 
-      if (found !== undefined && !(state.status === "ready" && state.version === found)) {
+      if (found !== undefined && !isReady(found)) {
         await tell(`Downloading ${app.name} ${found}`, '"Restart to Update" appears in the menu bar once it has downloaded.');
       } else if (state.status !== "ready") {
         await tell("You're on the latest version", `${app.name} ${app.getVersion()}`);
-      } else if (controller.state.status === "in-call") {
+      } else if (controller.inCall) {
         await tell(`${app.name} ${state.version} is ready to install`, "You can restart to update once you leave the call.");
       } else {
         const { response } = await dialog.showMessageBox({
@@ -119,6 +123,7 @@ export function startUpdates(
           defaultId: 0,
           cancelId: 1,
         });
+
         if (response === 0) {
           await updates.restartToUpdate();
         }
@@ -126,7 +131,7 @@ export function startUpdates(
     },
 
     async restartToUpdate() {
-      if (source === undefined || state.status !== "ready" || controller.state.status === "in-call") {
+      if (source === undefined || state.status !== "ready" || controller.inCall) {
         return;
       }
 

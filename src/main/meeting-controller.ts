@@ -126,6 +126,11 @@ export interface MeetingController {
   readonly state: MeetingState;
 
   /**
+   * Whether the Meeting State is in a call.
+   */
+  readonly inCall: boolean;
+
+  /**
    * Calls `listener` with the new Meeting State each time it changes.
    */
   onStateChange(listener: (state: MeetingState) => void): void;
@@ -306,6 +311,10 @@ export function createMeetingController({
   return {
     get state() {
       return state();
+    },
+
+    get inCall() {
+      return status === "in-call";
     },
 
     onStateChange(listener) {
