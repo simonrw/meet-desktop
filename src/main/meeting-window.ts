@@ -34,6 +34,11 @@ const MEET_PERMISSIONS = new Set([
 
 export interface MeetingWindow extends MeetingWindowPort {
   readonly webContents: WebContents;
+
+  /**
+   * Sets whether the Full window floats above other apps' windows, on the current Space only.
+   */
+  keepOnTop(onTop: boolean): void;
 }
 
 /**
@@ -71,6 +76,7 @@ export function createMeetingWindow(meetOrigin: string, onCloseRequested: () => 
     webContents: window.webContents,
     show,
     hide: () => hide(window),
+    keepOnTop: (onTop) => window.setAlwaysOnTop(onTop, "floating"),
 
     async confirmLeave() {
       // The question is a sheet on the window, which may be hidden or behind another app.

@@ -54,15 +54,15 @@ function hotkeyRow(hotkey: SettingsView["hotkeys"][number]): HTMLElement {
   return row;
 }
 
-function launchAtLoginOption(enabled: boolean): HTMLElement {
+function option(type: "launch-at-login" | "always-on-top", text: string, enabled: boolean): HTMLElement {
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
-  checkbox.id = "launch-at-login";
+  checkbox.id = type;
   checkbox.checked = enabled;
-  checkbox.addEventListener("change", () => change({ type: "launch-at-login", enabled: checkbox.checked }));
+  checkbox.addEventListener("change", () => change({ type, enabled: checkbox.checked }));
 
   const label = document.createElement("label");
-  label.append(checkbox, " Launch at login");
+  label.append(checkbox, ` ${text}`);
 
   return label;
 }
@@ -84,7 +84,8 @@ function render(view: SettingsView): void {
     heading("Hotkeys"),
     ...view.hotkeys.map(hotkeyRow),
     heading("General"),
-    launchAtLoginOption(view.launchAtLogin),
+    option("launch-at-login", "Launch at login", view.launchAtLogin),
+    option("always-on-top", "Keep window on top", view.alwaysOnTop),
   );
 
   if (focused) {

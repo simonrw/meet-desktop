@@ -35,6 +35,21 @@ function isRegistered(accelerator: string) {
   return app.evaluate(({ globalShortcut }, accelerator) => globalShortcut.isRegistered(accelerator), accelerator);
 }
 
+/**
+ * Reads the stacking, visibility and bounds of the window showing `origin`, which picks out the Meeting Window or
+ * the settings window.
+ */
+function windowState(origin: string) {
+  return app.evaluate(({ BrowserWindow }, origin) => {
+    const window = BrowserWindow.getAllWindows().find((window) => window.webContents.getURL().startsWith(origin));
+    return window && { onTop: window.isAlwaysOnTop(), visible: window.isVisible(), bounds: window.getBounds() };
+  }, origin);
+}
+
+async function isMeetingWindowOnTop() {
+  return (await windowState(meet.origin))?.onTop;
+}
+
 async function record(settings: Page, hotkey: string, keys: string) {
   await settings.getByRole("group", { name: hotkey }).getByRole("button", { name: "Record" }).click();
   await expect(settings.getByRole("group", { name: hotkey })).toContainText("Press a combination");
@@ -199,4 +214,83 @@ test("the launch at login option adds the app to and removes it from login items
   await option.uncheck();
 
   await expect.poll(openAtLogin).toBe(false);
+});
+
+test("the keep window on top option is off by default", async () => {
+  const settings = await openSettings();
+
+  await expect(settings.getByRole("checkbox", { name: "Keep window on top" })).not.toBeChecked();
+
+  expect(await isMeetingWindowOnTop()).toBe(false);
+});
+
+test("ticking keep window on top puts the Meeting Window on top straight away, and unticking takes it off", async () => {
+  const settings = await openSettings();
+  const option = settings.getByRole("checkbox", { name: "Keep window on top" });
+
+  await option.check();
+
+  await expect.poll(isMeetingWindowOnTop).toBe(true);
+
+  await option.uncheck();
+
+  await expect.poll(isMeetingWindowOnTop).toBe(false);
+});
+
+test("keep window on top survives a relaunch", async () => {
+  const settings = await openSettings();
+  await settings.getByRole("checkbox", { name: "Keep window on top" }).check();
+  await expect.poll(isMeetingWindowOnTop).toBe(true);
+
+  await app.close();
+  app = await launchApp(meet.origin, userData);
+  await app.firstWindow();
+
+  expect(await isMeetingWindowOnTop()).toBe(true);
+
+  const reopened = await openSettings();
+  await expect(reopened.getByRole("checkbox", { name: "Keep window on top" })).toBeChecked();
+});
+
+test("keep window on top leaves the Meeting Window's size and position alone", async () => {
+  const before = (await windowState(meet.origin))?.bounds;
+  const settings = await openSettings();
+  const option = settings.getByRole("checkbox", { name: "Keep window on top" });
+
+  await option.check();
+  await expect.poll(isMeetingWindowOnTop).toBe(true);
+
+  expect((await windowState(meet.origin))?.bounds).toEqual(before);
+
+  await option.uncheck();
+  await expect.poll(isMeetingWindowOnTop).toBe(false);
+
+  expect((await windowState(meet.origin))?.bounds).toEqual(before);
+});
+
+test("with keep window on top, closing hides the Meeting Window and the show window Command brings it back on top", async () => {
+  const settings = await openSettings();
+  await settings.getByRole("checkbox", { name: "Keep window on top" }).check();
+  await expect.poll(isMeetingWindowOnTop).toBe(true);
+
+  await app.evaluate(({ BrowserWindow }, origin) => {
+    BrowserWindow.getAllWindows()
+      .find((window) => window.webContents.getURL().startsWith(origin))
+      ?.close();
+  }, meet.origin);
+
+  await expect.poll(async () => (await windowState(meet.origin))?.visible).toBe(false);
+
+  await app.evaluate(() => globalThis.meetingController?.command({ type: "show-window" }));
+
+  expect(await windowState(meet.origin)).toMatchObject({ visible: true, onTop: true });
+});
+
+test("the settings window floats so a Meeting Window kept on top can't cover it", async () => {
+  const settings = await openSettings();
+
+  await settings.getByRole("checkbox", { name: "Keep window on top" }).check();
+  await expect.poll(isMeetingWindowOnTop).toBe(true);
+
+  expect((await windowState("data:"))?.onTop).toBe(true);
 });

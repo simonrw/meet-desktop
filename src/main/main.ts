@@ -40,7 +40,7 @@ if (!app.requestSingleInstanceLock()) {
     const meetBridge = connectMeetBridge(meetingWindow.webContents, (signal) => meetingController.signal(signal));
     const meetingController = createMeetingController({ meetBridge, meetingWindow });
 
-    const settingsWindow = startSettings((command) => meetingController.command(command));
+    const settingsWindow = startSettings(meetingWindow, (command) => meetingController.command(command));
     setAppMenu(() => settingsWindow.open());
     const menuBar = startMenuBar(meetingController, () => settingsWindow.open());
 

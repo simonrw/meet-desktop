@@ -5,6 +5,7 @@ import { app, BrowserWindow } from "electron";
 import { acceleratorFromKey, acceleratorLabel, type RecordedKey } from "./accelerator";
 import { pauseHotkeys, registerHotkeys } from "./hotkeys";
 import type { Command } from "./meeting-controller";
+import type { MeetingWindow } from "./meeting-window";
 import { HOTKEY_NAMES, loadSettings, saveSettings, type HotkeyName, type Settings } from "./settings-store";
 
 export type ViewChannel = "settings:view";
@@ -24,6 +25,7 @@ export interface SettingsView {
     error?: string;
   }>;
   launchAtLogin: boolean;
+  alwaysOnTop: boolean;
 }
 
 /**
@@ -34,7 +36,8 @@ export type SettingsChange =
   | { type: "key"; key: RecordedKey }
   | { type: "cancel-recording" }
   | { type: "turn-off"; name: HotkeyName }
-  | { type: "launch-at-login"; enabled: boolean };
+  | { type: "launch-at-login"; enabled: boolean }
+  | { type: "always-on-top"; enabled: boolean };
 
 export interface SettingsWindow {
   /**
@@ -70,6 +73,7 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
       kbd.recording { outline: 2px solid Highlight; }
       kbd.off { color: GrayText; }
       .error { grid-column: 1 / -1; margin: 0; color: #d70015; }
+      label { display: block; padding: 2px 0; }
     </style>
   </head>
   <body></body>
@@ -77,9 +81,13 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
 
 /**
  * Loads the user's settings and applies them, registering the hotkeys that are turned on, which send their Commands
- * to `onCommand`. Returns the settings window, where each change takes effect straight away.
+ * to `onCommand`, and keeping `meetingWindow` on top when the user asked for it. Returns the settings window, where
+ * each change takes effect straight away.
  */
-export function startSettings(onCommand: (command: Command) => void): SettingsWindow {
+export function startSettings(
+  meetingWindow: Pick<MeetingWindow, "keepOnTop">,
+  onCommand: (command: Command) => void,
+): SettingsWindow {
   const file = join(app.getPath("userData"), "settings.json");
 
   let settings = loadSettings(file);
@@ -92,6 +100,11 @@ export function startSettings(onCommand: (command: Command) => void): SettingsWi
     failed = registerHotkeys(settings.hotkeys, onCommand);
   };
 
+  const apply = () => {
+    applyHotkeys();
+    meetingWindow.keepOnTop(settings.alwaysOnTop);
+  };
+
   const bind = (name: HotkeyName, accelerator: string | null): Settings => {
     return { ...settings, hotkeys: { ...settings.hotkeys, [name]: accelerator } };
   };
@@ -99,7 +112,7 @@ export function startSettings(onCommand: (command: Command) => void): SettingsWi
   const save = (changed: Settings) => {
     settings = changed;
     saveSettings(file, settings);
-    applyHotkeys();
+    apply();
   };
 
   const stopRecording = () => {
@@ -171,6 +184,10 @@ export function startSettings(onCommand: (command: Command) => void): SettingsWi
       case "launch-at-login":
         app.setLoginItemSettings({ openAtLogin: change.enabled });
         break;
+
+      case "always-on-top":
+        save({ ...settings, alwaysOnTop: change.enabled });
+        break;
     }
   };
 
@@ -203,9 +220,10 @@ export function startSettings(onCommand: (command: Command) => void): SettingsWi
       };
     }),
     launchAtLogin: app.getLoginItemSettings().openAtLogin,
+    alwaysOnTop: settings.alwaysOnTop,
   });
 
-  applyHotkeys();
+  apply();
 
   return {
     open() {
@@ -223,6 +241,10 @@ export function startSettings(onCommand: (command: Command) => void): SettingsWi
         minimizable: false,
         maximizable: false,
         fullscreenable: false,
+
+        // Otherwise a Meeting Window kept on top could cover the option that turns it off.
+        alwaysOnTop: true,
+
         webPreferences: { sandbox: true, contextIsolation: true, preload: SETTINGS_PRELOAD },
       });
 
