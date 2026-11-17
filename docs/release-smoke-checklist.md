@@ -9,6 +9,14 @@ If a step fails, the Meet hooks in `src/preload/meet-bridge.ts` are the first pl
 - [ ] Launch the app and start or open a meeting. In the lobby (Meet's pre-join screen), the app has not yet treated you as in a call (the mute hotkey does nothing).
 - [ ] Join the meeting. Camera and microphone work.
 
+## Join prompt and URL scheme
+
+- [ ] Copy a real Meet link (from a calendar invite), focus another app and choose Join Meeting… in the menu bar menu: the prompt comes to the front with the meeting code filled in. Press Return: the Meeting Window comes to the front on that meeting's pre-join screen.
+- [ ] Copy some ordinary text and press Cmd+J in the app: the prompt opens empty. Type `nonsense` and press Return: an error shows under the field and nothing else happens. Press Escape: the prompt closes.
+- [ ] Join a call, then use the prompt to join another meeting: the window asks "Leave the call and join …?". Cancel: the call carries on. Try again and choose Leave and Join: the other meeting's pre-join screen opens and you have left the first call (check from a second device).
+- [ ] With the app running and its window hidden, run `open meet-desktop://<code>` in Terminal: the Meeting Window comes to the front on that meeting's pre-join screen.
+- [ ] Quit the app and run the same command: the app launches straight onto that meeting's pre-join screen.
+
 ## Mute by hotkey
 
 The default mute hotkey is Control+Option+M.

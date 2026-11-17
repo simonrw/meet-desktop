@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { createMeetingController, type Command } from "./meeting-controller";
+import { createMeetingController, type PlainCommand } from "./meeting-controller";
 
 function setup() {
   const bridgeActions: string[] = [];
@@ -18,7 +18,9 @@ function setup() {
     meetingWindow: {
       show: () => windowActions.push("show"),
       hide: () => windowActions.push("hide"),
+      openMeeting: (code) => windowActions.push(`open ${code}`),
       confirmLeave: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
+      confirmSwitch: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
     },
   });
   controller.onStateChange((state) => announcedStates.push(state));
@@ -171,7 +173,7 @@ describe("Meeting State changes", () => {
   });
 });
 
-describe.each<Command["type"]>(["toggle-mute", "toggle-camera", "toggle-hand"])("%s Command", (type) => {
+describe.each<PlainCommand["type"]>(["toggle-mute", "toggle-camera", "toggle-hand"])("%s Command", (type) => {
   test("is carried out through the Meet Bridge during a call", () => {
     const { controller, bridgeActions } = setup();
     controller.signal({ type: "entered-call" });
@@ -347,5 +349,66 @@ describe("close window Command", () => {
 
     expect(bridgeActions).toEqual([]);
     expect(windowActions).toEqual(["hide"]);
+  });
+});
+
+describe("join meeting Command", () => {
+  const join = { type: "join-meeting", code: "abc-defg-hij" } as const;
+
+  test("opens the meeting without asking outside a call", () => {
+    const { controller, windowActions, pendingConfirmations } = setup();
+
+    controller.command(join);
+    controller.signal({ type: "entered-lobby" });
+    controller.command(join);
+
+    expect(windowActions).toEqual(["open abc-defg-hij", "open abc-defg-hij"]);
+    expect(pendingConfirmations).toHaveLength(0);
+  });
+
+  test("opens the meeting during a call once the user confirms", async () => {
+    const { controller, windowActions, answerConfirmation } = setup();
+    controller.signal({ type: "entered-call" });
+
+    controller.command(join);
+    expect(windowActions).toEqual([]);
+
+    await answerConfirmation(true);
+    expect(windowActions).toEqual(["open abc-defg-hij"]);
+  });
+
+  test("keeps the call going when the user cancels", async () => {
+    const { controller, bridgeActions, windowActions, answerConfirmation } = setup();
+    controller.signal({ type: "entered-call" });
+
+    controller.command(join);
+    await answerConfirmation(false);
+
+    expect(windowActions).toEqual([]);
+    expect(bridgeActions).toEqual([]);
+    expect(controller.state).toEqual(inCall());
+  });
+
+  test("asks only once when another question is already on screen", async () => {
+    const { controller, windowActions, pendingConfirmations, answerConfirmation } = setup();
+    controller.signal({ type: "entered-call" });
+    controller.command({ type: "leave-call" });
+
+    controller.command(join);
+    expect(pendingConfirmations).toHaveLength(1);
+
+    await answerConfirmation(true);
+    expect(windowActions).toEqual([]);
+  });
+
+  test("still opens the meeting when the call ended while the question was on screen", async () => {
+    const { controller, windowActions, answerConfirmation } = setup();
+    controller.signal({ type: "entered-call" });
+    controller.command(join);
+
+    controller.signal({ type: "left-call" });
+    await answerConfirmation(true);
+
+    expect(windowActions).toEqual(["open abc-defg-hij"]);
   });
 });

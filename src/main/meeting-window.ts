@@ -79,23 +79,31 @@ export function createMeetingWindow(meetOrigin: string, onCloseRequested: () => 
     hide: () => hide(window),
     keepOnTop: (onTop) => window.setAlwaysOnTop(onTop, "floating"),
 
-    async confirmLeave() {
-      // The question is a sheet on the window, which may be hidden or behind another app.
+    openMeeting(code) {
+      window.loadURL(new URL(code, meetOrigin).href);
       show();
-
-      const { response } = await dialog.showMessageBox(window, {
-        type: "question",
-        message: "Leave the call?",
-        buttons: ["Leave", "Cancel"],
-
-        // Return must not hang up: the question can appear while the user is typing in another app.
-        defaultId: 1,
-        cancelId: 1,
-      });
-
-      return response === 0;
     },
+
+    confirmLeave: () => confirmLeave(window, show, "Leave the call?", "Leave"),
+    confirmSwitch: (code) => confirmLeave(window, show, `Leave the call and join ${code}?`, "Leave and Join"),
   };
+}
+
+async function confirmLeave(window: BrowserWindow, show: () => void, message: string, leave: string): Promise<boolean> {
+  // The question is a sheet on the window, which may be hidden or behind another app.
+  show();
+
+  const { response } = await dialog.showMessageBox(window, {
+    type: "question",
+    message,
+    buttons: [leave, "Cancel"],
+
+    // Return must not hang up: the question can appear while the user is typing in another app.
+    defaultId: 1,
+    cancelId: 1,
+  });
+
+  return response === 0;
 }
 
 function configureSession(meetSession: Session, meetOrigin: string): void {
@@ -150,6 +158,10 @@ function routeNavigation(window: BrowserWindow, meetOrigin: string): void {
 
     return { action: "deny" };
   });
+
+  // Electron turns a page's "leave site?" prompt into a silent refusal, which would stop a confirmed switch to another
+  // meeting.
+  contents.on("will-prevent-unload", (event) => event.preventDefault());
 
   contents.on("will-navigate", (event) => {
     // Only links clicked inside Meet are policed: sign-in flows (including Workspace SSO providers) hop across

@@ -13,9 +13,14 @@ export type MeetSignal =
   | { type: "camera-changed"; cameraOn: boolean }
   | { type: "hand-changed"; handRaised: boolean };
 
-export type Command = {
+/**
+ * A Command that carries nothing beyond its type.
+ */
+export type PlainCommand = {
   type: "toggle-mute" | "toggle-camera" | "toggle-hand" | "leave-call" | "show-window" | "close-window";
 };
+
+export type Command = PlainCommand | { type: "join-meeting"; code: string };
 
 export interface MeetBridgePort {
   toggleMute(): void;
@@ -29,9 +34,19 @@ export interface MeetingWindowPort {
   hide(): void;
 
   /**
+   * Opens the pre-join screen of the meeting with the given code and brings the window to the front.
+   */
+  openMeeting(code: string): void;
+
+  /**
    * Asks the user whether to leave the call, resolving to true if they agree.
    */
   confirmLeave(): Promise<boolean>;
+
+  /**
+   * Asks the user whether to leave the call to join the meeting with the given code, resolving to true if they agree.
+   */
+  confirmSwitch(code: string): Promise<boolean>;
 }
 
 export interface MeetingController {
@@ -61,23 +76,31 @@ export function createMeetingController({
   let muted = false;
   let cameraOn = true;
   let handRaised = false;
-  let confirmingLeave = false;
+  let confirming = false;
   const listeners: Array<(state: MeetingState) => void> = [];
 
   const state = (): MeetingState => (status === "in-call" ? { status, muted, cameraOn, handRaised } : { status });
 
   /**
-   * Leaves the call if the user agrees to, resolving to whether they agreed.
+   * Puts a question to the user, resolving to whether they agreed. Resolves to false without asking while another
+   * question is on screen.
    */
-  async function leaveOnceConfirmed(): Promise<boolean> {
-    if (confirmingLeave) {
+  async function confirm(ask: () => Promise<boolean>): Promise<boolean> {
+    if (confirming) {
       return false;
     }
 
-    confirmingLeave = true;
-    const confirmed = await meetingWindow.confirmLeave().finally(() => {
-      confirmingLeave = false;
+    confirming = true;
+    return ask().finally(() => {
+      confirming = false;
     });
+  }
+
+  /**
+   * Leaves the call if the user agrees to, resolving to whether they agreed.
+   */
+  async function leaveOnceConfirmed(): Promise<boolean> {
+    const confirmed = await confirm(() => meetingWindow.confirmLeave());
 
     // The call may have ended while the question was on screen.
     if (confirmed && status === "in-call") {
@@ -85,6 +108,12 @@ export function createMeetingController({
     }
 
     return confirmed;
+  }
+
+  async function joinMeeting(code: string): Promise<void> {
+    if (status !== "in-call" || (await confirm(() => meetingWindow.confirmSwitch(code)))) {
+      meetingWindow.openMeeting(code);
+    }
   }
 
   async function closeWindow(): Promise<void> {
@@ -148,6 +177,10 @@ export function createMeetingController({
 
         case "close-window":
           void closeWindow();
+          return;
+
+        case "join-meeting":
+          void joinMeeting(command.code);
           return;
       }
 

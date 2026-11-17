@@ -5,6 +5,7 @@ Google Meet in its own macOS window, with system-wide hotkeys to control the cal
 ## Features
 
 - **Its own window**: Meet runs in a dedicated window with its own Google login, kept separate from your browser profile. The login survives relaunches, and the window remembers its size and position.
+- **Quick joining**: paste a Meet link or meeting code into the join prompt (Cmd+J), or open a `meet-desktop://` URL from a script, Raycast or Alfred.
 - **Menu bar item**: a microphone icon in the menu bar shows whether you're in a call and whether you're muted, and its menu controls the call.
 - **Global hotkeys**: mute, toggle the camera, raise your hand, bring the window forward or leave the call, whichever app is focused.
 - **Screen sharing**: pick a whole screen or a single window to share from the app's own picker.
@@ -33,6 +34,20 @@ Open the app and sign in to Google as you would in a browser, then start or join
 
 The first time you join a call, macOS asks for camera and microphone access. Allow both.
 
+### Joining a meeting
+
+Press Cmd+J (or File > Join Meeting…, or Join Meeting… in the menu bar menu) and enter a Meet link such as `https://meet.google.com/abc-defg-hij`, or just the code `abc-defg-hij`. Press Return to open the meeting's pre-join screen. If you copied a Meet link or code before opening the prompt, it's already filled in, so Return joins it straight away. Escape closes the prompt.
+
+To open a meeting from a script, Raycast or Alfred, open a URL in the app's own scheme:
+
+```sh
+open meet-desktop://abc-defg-hij
+```
+
+This works whether or not Meet is running. The scheme is only registered for the packaged app, not for `npm start`.
+
+Joining another meeting during a call asks first whether to leave the current one.
+
 ### Hotkeys
 
 The hotkeys work from any app, but only while you're in a call (not on Meet's home screen or the pre-join screen). Show window works at any time.
@@ -57,7 +72,7 @@ The microphone icon in the menu bar shows where you are:
 - **Filled**: in a call.
 - **Crossed out**: in a call and muted.
 
-Click it for Mute, Turn Off Camera, Show Window, Leave Call…, Settings… and Quit Meet. Mute, camera and Leave Call are greyed out outside a call. Leave Call asks before hanging up, as the hotkey does. The menu works while the window is hidden.
+Click it for Mute, Turn Off Camera, Show Window, Leave Call…, Join Meeting…, Settings… and Quit Meet. Mute, camera and Leave Call are greyed out outside a call. Leave Call asks before hanging up, as the hotkey does. The menu works while the window is hidden.
 
 ### Settings
 

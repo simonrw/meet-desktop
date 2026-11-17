@@ -12,6 +12,8 @@
       - the hand control, with `aria-pressed` and an aria-label naming the hand (call only)
       - the "Leave call" control (call only)
 
+      A meeting code path, such as `/abc-defg-hij`, opens on the lobby, and any other path on the home screen.
+
       The "Share screen" control (call only) asks for display media as Meet does, and `#share-status` shows the outcome.
     -->
     <main id="screen"></main>
@@ -116,7 +118,7 @@
 
       document.addEventListener("click", (event) => clicks[event.target.id]?.());
 
-      show("home");
+      show(/^\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(location.pathname) ? "lobby" : "home");
     </script>
   </body>
 </html>

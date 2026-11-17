@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
-import type { Command } from "../src/main/meeting-controller";
+import type { PlainCommand } from "../src/main/meeting-controller";
 import { launchApp, startStubMeet } from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
@@ -22,7 +22,7 @@ function meetingState() {
   return app.evaluate(() => globalThis.meetingController?.state);
 }
 
-function send(type: Command["type"]) {
+function send(type: PlainCommand["type"]) {
   return app.evaluate((_electron, type) => globalThis.meetingController?.command({ type }), type);
 }
 

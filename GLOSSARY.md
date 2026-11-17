@@ -17,8 +17,16 @@ An observation from the Meet page, for example "entered lobby", "entered call", 
 _Avoid_: Event, page event
 
 **Command**:
-A user intent from a hotkey, the menu bar or the UI, for example "toggle mute", "leave call", "show window" or "close window". Call-only Commands (mute, camera, hand, leave) do nothing outside `in-call`. The leave call Command, and the close window Command during a call, leave only once the user confirms.
+A user intent from a hotkey, the menu bar or the UI, for example "toggle mute", "leave call", "show window", "close window" or "join meeting". Call-only Commands (mute, camera, hand, leave) do nothing outside `in-call`. The leave call Command, and the close window and join meeting Commands during a call, leave only once the user confirms.
 _Avoid_: Action, shortcut
+
+**Join Prompt**:
+A small window that takes a Meet link or meeting code and opens that meeting's pre-join screen in the Meeting Window. It is prefilled with a Meet link or code found on the clipboard.
+_Avoid_: Join dialog, join box
+
+**Meeting Code**:
+The `abc-defg-hij` part of a Meet link, which names a meeting. The app's own URL scheme opens one, as in `meet-desktop://abc-defg-hij`.
+_Avoid_: Meeting ID, room
 
 **Hotkey**:
 A system-wide key combination that sends a Command whichever app is focused. The user can record a different combination for each hotkey, or turn it off.
