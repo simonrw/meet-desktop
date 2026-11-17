@@ -1,12 +1,51 @@
 import { describe, expect, test } from "vitest";
 
+import type { Integration, LedgerEntries } from "./integration-lifecycle";
 import { createMeetingController, type PlainCommand } from "./meeting-controller";
 
-function setup() {
+interface FakeIntegrationOptions {
+  enabled?: boolean;
+  failApply?: string;
+  failRestore?: string;
+}
+
+function setup({
+  integrations: integrationOptions = { focus: {} },
+  ledger: ledgerEntries = {},
+}: {
+  integrations?: Record<string, FakeIntegrationOptions>;
+  ledger?: LedgerEntries;
+} = {}) {
   const bridgeActions: string[] = [];
   const windowActions: string[] = [];
+  const integrationActions: string[] = [];
   const pendingConfirmations: Array<(confirmed: boolean) => void> = [];
   const announcedStates: unknown[] = [];
+
+  const ledger = { entries: ledgerEntries };
+  const clock = fakeClock();
+
+  const integrations = Object.entries(integrationOptions).map(([id, options]): Integration => ({
+    id,
+    label: id,
+    enabled: options.enabled ?? true,
+
+    async apply() {
+      integrationActions.push(`${id}:apply`);
+      if (options.failApply) {
+        throw new Error(options.failApply);
+      }
+
+      return { appliedBy: id };
+    },
+
+    async restore(saved) {
+      integrationActions.push(`${id}:restore ${JSON.stringify(saved)}`);
+      if (options.failRestore) {
+        throw new Error(options.failRestore);
+      }
+    },
+  }));
 
   const controller = createMeetingController({
     meetBridge: {
@@ -22,6 +61,14 @@ function setup() {
       confirmLeave: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
       confirmSwitch: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
     },
+    integrations,
+    ledger: {
+      read: () => ledger.entries,
+      write: (entries) => {
+        ledger.entries = entries;
+      },
+    },
+    clock,
   });
   controller.onStateChange((state) => announcedStates.push(state));
 
@@ -31,10 +78,56 @@ function setup() {
   async function answerConfirmation(confirmed: boolean) {
     pendingConfirmations.shift()?.(confirmed);
 
-    await new Promise((resolve) => setTimeout(resolve));
+    await settle();
   }
 
-  return { controller, bridgeActions, windowActions, pendingConfirmations, announcedStates, answerConfirmation };
+  return {
+    controller,
+    bridgeActions,
+    windowActions,
+    integrationActions,
+    pendingConfirmations,
+    announcedStates,
+    ledger,
+    clock,
+    answerConfirmation,
+  };
+}
+
+/**
+ * Waits for the controller to finish the Integration work it has started.
+ */
+function settle() {
+  return new Promise((resolve) => setTimeout(resolve));
+}
+
+function fakeClock() {
+  let now = 0;
+  let timers: Array<{ at: number; callback: () => void }> = [];
+
+  return {
+    schedule(delayMs: number, callback: () => void) {
+      const timer = { at: now + delayMs, callback };
+      timers.push(timer);
+
+      return () => {
+        timers = timers.filter((other) => other !== timer);
+      };
+    },
+
+    /**
+     * Moves time forward, running the callbacks that fall due, and waits for the work they start.
+     */
+    async advance(ms: number) {
+      now += ms;
+
+      const due = timers.filter((timer) => timer.at <= now);
+      timers = timers.filter((timer) => timer.at > now);
+      due.forEach((timer) => timer.callback());
+
+      await settle();
+    },
+  };
 }
 
 function inCall(overrides: { muted?: boolean; cameraOn?: boolean; handRaised?: boolean } = {}) {
@@ -349,6 +442,229 @@ describe("close window Command", () => {
 
     expect(bridgeActions).toEqual([]);
     expect(windowActions).toEqual(["hide"]);
+  });
+});
+
+describe("Integrations", () => {
+  test("apply on entering a call, not in the lobby", async () => {
+    const { controller, integrationActions } = setup();
+
+    controller.signal({ type: "entered-lobby" });
+    await settle();
+    expect(integrationActions).toEqual([]);
+
+    controller.signal({ type: "entered-call" });
+    await settle();
+    expect(integrationActions).toEqual(["focus:apply"]);
+  });
+
+  test("apply only when turned on", async () => {
+    const { controller, integrationActions } = setup({ integrations: { focus: { enabled: false }, slack: {} } });
+
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    expect(integrationActions).toEqual(["slack:apply"]);
+  });
+
+  test("restore with the state they saved once the user has been out of a call for 30 seconds", async () => {
+    const { controller, integrationActions, clock } = setup();
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    controller.signal({ type: "left-call" });
+    await clock.advance(29_000);
+    expect(integrationActions).toEqual(["focus:apply"]);
+
+    await clock.advance(1_000);
+    expect(integrationActions).toEqual(["focus:apply", 'focus:restore {"appliedBy":"focus"}']);
+  });
+
+  test("stay applied, without restoring and applying again, when the user goes straight into another call", async () => {
+    const { controller, integrationActions, clock } = setup();
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    controller.signal({ type: "left-call" });
+    await clock.advance(10_000);
+    controller.signal({ type: "entered-lobby" });
+    await clock.advance(10_000);
+    controller.signal({ type: "entered-call" });
+    await clock.advance(60_000);
+    expect(integrationActions).toEqual(["focus:apply"]);
+
+    controller.signal({ type: "left-call" });
+    await clock.advance(30_000);
+    expect(integrationActions).toEqual(["focus:apply", 'focus:restore {"appliedBy":"focus"}']);
+  });
+
+  test("stay applied when the user switches to another meeting with the join meeting Command", async () => {
+    const { controller, integrationActions, clock, answerConfirmation } = setup();
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    controller.command({ type: "join-meeting", code: "abc-defg-hij" });
+    await answerConfirmation(true);
+    controller.signal({ type: "left-call" });
+    controller.signal({ type: "entered-lobby" });
+    await clock.advance(5_000);
+    controller.signal({ type: "entered-call" });
+    await clock.advance(60_000);
+
+    expect(integrationActions).toEqual(["focus:apply"]);
+  });
+
+  test("restore and apply again for a call joined after the 30 seconds", async () => {
+    const { controller, integrationActions, clock } = setup();
+    controller.signal({ type: "entered-call" });
+    await settle();
+    controller.signal({ type: "left-call" });
+    await clock.advance(30_000);
+
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    expect(integrationActions).toEqual(["focus:apply", 'focus:restore {"appliedBy":"focus"}', "focus:apply"]);
+  });
+});
+
+describe.each<{ route: string; leave: (context: ReturnType<typeof setup>) => Promise<void> }>([
+  {
+    // Meet's leave button, being removed and the call ending all reach the controller as the left call signal.
+    route: "Meet reports the call is over",
+    leave: async ({ controller, clock }) => {
+      controller.signal({ type: "left-call" });
+      await clock.advance(30_000);
+    },
+  },
+  {
+    route: "the user leaves with the leave call Command",
+    leave: async ({ controller, clock, answerConfirmation }) => {
+      controller.command({ type: "leave-call" });
+      await answerConfirmation(true);
+      controller.signal({ type: "left-call" });
+      await clock.advance(30_000);
+    },
+  },
+  {
+    route: "the user closes the Meeting Window",
+    leave: async ({ controller, clock, answerConfirmation }) => {
+      controller.command({ type: "close-window" });
+      await answerConfirmation(true);
+      controller.signal({ type: "left-call" });
+      await clock.advance(30_000);
+    },
+  },
+  {
+    route: "the app quits",
+    leave: ({ controller }) => controller.quit(),
+  },
+])("when $route", ({ leave }) => {
+  test("Integrations restore and the Integration Ledger is cleared", async () => {
+    const context = setup();
+    context.controller.signal({ type: "entered-call" });
+    await settle();
+    expect(context.ledger.entries).toEqual({ focus: { appliedBy: "focus" } });
+
+    await leave(context);
+
+    expect(context.integrationActions).toEqual(["focus:apply", 'focus:restore {"appliedBy":"focus"}']);
+    expect(context.ledger.entries).toEqual({});
+  });
+});
+
+describe("quitting", () => {
+  test("in the 30 seconds after a call restores Integrations straight away", async () => {
+    const { controller, integrationActions } = setup();
+    controller.signal({ type: "entered-call" });
+    controller.signal({ type: "left-call" });
+
+    await controller.quit();
+
+    expect(integrationActions).toEqual(["focus:apply", 'focus:restore {"appliedBy":"focus"}']);
+  });
+
+  test("outside a call leaves Integrations alone", async () => {
+    const { controller, integrationActions } = setup();
+
+    await controller.quit();
+
+    expect(integrationActions).toEqual([]);
+  });
+});
+
+describe("Integration failures", () => {
+  test("of one Integration to apply leave the call and the other Integrations alone, and are shown as status", async () => {
+    const { controller, integrationActions, ledger } = setup({
+      integrations: { focus: { failApply: "Shortcut not found" }, slack: {} },
+    });
+
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    expect(controller.state).toEqual(inCall());
+    expect(integrationActions).toEqual(["focus:apply", "slack:apply"]);
+    expect(ledger.entries).toEqual({ slack: { appliedBy: "slack" } });
+
+    expect(controller.integrationFailures).toEqual(["focus wasn't turned on: Shortcut not found"]);
+  });
+
+  test("of one Integration to restore leave the other Integrations alone, and keep it in the Integration Ledger", async () => {
+    const { controller, integrationActions, ledger } = setup({
+      integrations: { focus: { failRestore: "Shortcut not found" }, slack: {} },
+    });
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    await controller.quit();
+
+    expect(integrationActions).toEqual([
+      "focus:apply",
+      "slack:apply",
+      'focus:restore {"appliedBy":"focus"}',
+      'slack:restore {"appliedBy":"slack"}',
+    ]);
+    expect(ledger.entries).toEqual({ focus: { appliedBy: "focus" } });
+
+    expect(controller.integrationFailures).toEqual(["focus wasn't turned off: Shortcut not found"]);
+  });
+
+  test("are announced to listeners, and cleared once the Integration next succeeds", async () => {
+    const { controller, clock } = setup({ integrations: { focus: { failRestore: "Shortcut not found" } } });
+    const announced: unknown[] = [];
+    controller.onIntegrationFailuresChange((failures) => announced.push(failures));
+    controller.signal({ type: "entered-call" });
+    controller.signal({ type: "left-call" });
+    await clock.advance(30_000);
+
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    expect(announced).toEqual([["focus wasn't turned off: Shortcut not found"], []]);
+    expect(controller.integrationFailures).toEqual([]);
+  });
+});
+
+describe("Integration Ledger", () => {
+  test("entries left by a crash mid-call are restored on startup, even for Integrations since turned off", async () => {
+    const { integrationActions, ledger } = setup({
+      integrations: { focus: { enabled: false }, slack: {} },
+      ledger: { focus: { appliedBy: "the last launch" } },
+    });
+
+    await settle();
+
+    expect(integrationActions).toEqual(['focus:restore {"appliedBy":"the last launch"}']);
+    expect(ledger.entries).toEqual({});
+  });
+
+  test("entries are restored on startup before a call joined straight away applies", async () => {
+    const { controller, integrationActions } = setup({ ledger: { focus: { appliedBy: "the last launch" } } });
+
+    controller.signal({ type: "entered-call" });
+    await settle();
+
+    expect(integrationActions).toEqual(['focus:restore {"appliedBy":"the last launch"}', "focus:apply"]);
   });
 });
 

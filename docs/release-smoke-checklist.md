@@ -67,6 +67,19 @@ The default leave hotkey is Control+Option+L.
 - [ ] Choose Leave Call… from the menu: the window comes forward asking "Leave the call?". Choose Leave: the icon goes back to outlined.
 - [ ] Settings… opens the settings window, and Quit Meet quits the app.
 
+## Focus
+
+Create the two Shortcuts described in the README's "Focus during calls" section, using a Focus whose indicator you can see in the menu bar.
+
+- [ ] In settings, press Test in the Focus section: the Focus turns on and then off, and the window says both Shortcuts ran.
+- [ ] Turn on "Turn on a Focus during calls". Open a meeting: in the lobby the Focus stays off. Join: the Focus turns on.
+- [ ] Leave with Meet's leave button: about 30 seconds later the Focus turns off.
+- [ ] Join, leave, and rejoin within 30 seconds: the Focus stays on throughout, and turns off about 30 seconds after the final leave.
+- [ ] Join and leave with the leave hotkey, then join and close the Meeting Window choosing Leave: each time the Focus turns off about 30 seconds later.
+- [ ] Join and quit Meet with Cmd+Q: the Focus turns off before the app quits.
+- [ ] Join, then force quit Meet (Activity Monitor > Force Quit): the Focus stays on. Open Meet again: the Focus turns off.
+- [ ] Rename the turn on Shortcut in the Shortcuts app and join: the menu bar menu says the Focus wasn't turned on, and the call carries on. Rename it back.
+
 ## Settings
 
 - [ ] Press Cmd+, in the app: the settings window opens, listing each hotkey's combination.

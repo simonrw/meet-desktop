@@ -3,6 +3,15 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 export type HotkeyName = "toggle-mute" | "toggle-camera" | "toggle-hand" | "show-window" | "leave-call";
 
 /**
+ * The Focus Integration's settings: whether it runs, and the names of the Shortcuts that turn the Focus on and off.
+ */
+export interface FocusSettings {
+  enabled: boolean;
+  turnOnShortcut: string;
+  turnOffShortcut: string;
+}
+
+/**
  * The user's settings. A hotkey bound to `null` is turned off.
  */
 export interface Settings {
@@ -10,6 +19,8 @@ export interface Settings {
 
   /** Whether the Meeting Window floats above other apps' windows. */
   alwaysOnTop: boolean;
+
+  focus: FocusSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,6 +32,11 @@ export const DEFAULT_SETTINGS: Settings = {
     "leave-call": "Control+Alt+L",
   },
   alwaysOnTop: false,
+  focus: {
+    enabled: false,
+    turnOnShortcut: "Turn On Meeting Focus",
+    turnOffShortcut: "Turn Off Meeting Focus",
+  },
 };
 
 export const HOTKEY_NAMES = Object.keys(DEFAULT_SETTINGS.hotkeys) as HotkeyName[];
@@ -52,7 +68,21 @@ export function loadSettings(file: string): Settings {
 
   const alwaysOnTop = typeof saved.alwaysOnTop === "boolean" ? saved.alwaysOnTop : DEFAULT_SETTINGS.alwaysOnTop;
 
-  return { hotkeys, alwaysOnTop };
+  const savedFocus: Record<string, unknown> = isRecord(saved.focus) ? saved.focus : {};
+  const focus = { ...DEFAULT_SETTINGS.focus };
+
+  if (typeof savedFocus.enabled === "boolean") {
+    focus.enabled = savedFocus.enabled;
+  }
+
+  for (const name of ["turnOnShortcut", "turnOffShortcut"] as const) {
+    const shortcut = savedFocus[name];
+    if (typeof shortcut === "string") {
+      focus[name] = shortcut;
+    }
+  }
+
+  return { hotkeys, alwaysOnTop, focus };
 }
 
 /**

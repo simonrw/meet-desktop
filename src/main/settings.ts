@@ -6,7 +6,14 @@ import { acceleratorFromKey, acceleratorLabel, type RecordedKey } from "./accele
 import { pauseHotkeys, registerHotkeys } from "./hotkeys";
 import type { Command } from "./meeting-controller";
 import type { MeetingWindow } from "./meeting-window";
-import { HOTKEY_NAMES, loadSettings, saveSettings, type HotkeyName, type Settings } from "./settings-store";
+import {
+  HOTKEY_NAMES,
+  loadSettings,
+  saveSettings,
+  type FocusSettings,
+  type HotkeyName,
+  type Settings,
+} from "./settings-store";
 
 export type ViewChannel = "settings:view";
 export type ChangeChannel = "settings:change";
@@ -26,6 +33,15 @@ export interface SettingsView {
   }>;
   launchAtLogin: boolean;
   alwaysOnTop: boolean;
+  focus: FocusSettings & {
+    /** How the last test of the Focus Shortcuts went, until the settings change. */
+    testResult?: FocusTestResult;
+  };
+}
+
+export interface FocusTestResult {
+  ok: boolean;
+  message: string;
 }
 
 /**
@@ -37,9 +53,13 @@ export type SettingsChange =
   | { type: "cancel-recording" }
   | { type: "turn-off"; name: HotkeyName }
   | { type: "launch-at-login"; enabled: boolean }
-  | { type: "always-on-top"; enabled: boolean };
+  | { type: "always-on-top"; enabled: boolean }
+  | { type: "focus"; focus: Partial<FocusSettings> }
+  | { type: "test-focus" };
 
 export interface SettingsWindow {
+  readonly focus: FocusSettings;
+
   /**
    * Opens the settings window, or brings it to the front when it's already open.
    */
@@ -74,6 +94,11 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
       kbd.off { color: GrayText; }
       .error { grid-column: 1 / -1; margin: 0; color: #d70015; }
       label { display: block; padding: 2px 0; }
+      .shortcut { display: grid; grid-template-columns: 9em 1fr; gap: 8px; align-items: center; padding: 4px 0; }
+      .help { margin: 4px 0 8px; color: GrayText; }
+      .help ol { margin: 4px 0; padding-left: 20px; }
+      .test-result { margin: 8px 0 0; }
+      .test-result.ok { color: #248a3d; }
     </style>
   </head>
   <body></body>
@@ -82,11 +107,12 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
 /**
  * Loads the user's settings and applies them, registering the hotkeys that are turned on, which send their Commands
  * to `onCommand`, and keeping `meetingWindow` on top when the user asked for it. Returns the settings window, where
- * each change takes effect straight away.
+ * each change takes effect straight away, and whose Focus test button calls `testFocus`.
  */
 export function startSettings(
   meetingWindow: Pick<MeetingWindow, "keepOnTop">,
   onCommand: (command: Command) => void,
+  testFocus: () => Promise<FocusTestResult>,
 ): SettingsWindow {
   const file = join(app.getPath("userData"), "settings.json");
 
@@ -94,6 +120,7 @@ export function startSettings(
   let failed: HotkeyName[] = [];
   let refusal: { name: HotkeyName; accelerator: string; owner: string } | undefined;
   let recording: HotkeyName | undefined;
+  let focusTestResult: FocusTestResult | undefined;
   let window: BrowserWindow | undefined;
 
   const applyHotkeys = () => {
@@ -159,7 +186,7 @@ export function startSettings(
     save(changed);
   };
 
-  const change = (change: SettingsChange) => {
+  const change = async (change: SettingsChange) => {
     switch (change.type) {
       case "record":
         refusal = undefined;
@@ -190,6 +217,15 @@ export function startSettings(
 
       case "always-on-top":
         save({ ...settings, alwaysOnTop: change.enabled });
+        break;
+
+      case "focus":
+        focusTestResult = undefined;
+        save({ ...settings, focus: { ...settings.focus, ...change.focus } });
+        break;
+
+      case "test-focus":
+        focusTestResult = await testFocus();
         break;
     }
   };
@@ -224,11 +260,16 @@ export function startSettings(
     }),
     launchAtLogin: app.getLoginItemSettings().openAtLogin,
     alwaysOnTop: settings.alwaysOnTop,
+    focus: { ...settings.focus, testResult: focusTestResult },
   });
 
   apply();
 
   return {
+    get focus() {
+      return settings.focus;
+    },
+
     open() {
       if (window) {
         window.focus();
@@ -237,7 +278,7 @@ export function startSettings(
 
       window = new BrowserWindow({
         width: 460,
-        height: 340,
+        height: 640,
         useContentSize: true,
         title: "Settings",
         resizable: false,
@@ -252,14 +293,15 @@ export function startSettings(
       });
 
       window.webContents.ipc.handle(VIEW_CHANNEL, view);
-      window.webContents.ipc.handle(CHANGE_CHANNEL, (_event, requested: SettingsChange) => {
-        change(requested);
+      window.webContents.ipc.handle(CHANGE_CHANNEL, async (_event, requested: SettingsChange) => {
+        await change(requested);
         return view();
       });
 
       window.once("closed", () => {
         window = undefined;
         refusal = undefined;
+        focusTestResult = undefined;
         stopRecording();
       });
 

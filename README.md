@@ -10,6 +10,7 @@ Google Meet in its own macOS window, with system-wide hotkeys to control the cal
 - **Global hotkeys**: mute, toggle the camera, raise your hand, bring the window forward or leave the call, whichever app is focused.
 - **Screen sharing**: pick a whole screen or a single window to share from the app's own picker.
 - **Safe closing**: closing the window during a call asks before leaving. Outside a call, closing just hides the window.
+- **Focus during calls**: turns a macOS Focus on when you join a call and off when you leave, through two Shortcuts you create.
 - **Links open in your browser**: links clicked inside Meet (for example in chat) open in your default browser. Meet and Google sign-in pages stay in the window.
 
 ## Requirements
@@ -84,6 +85,18 @@ Open settings with Cmd+, (or Meet > Settings…, or Settings… in the menu bar 
 
 If another app (for example Raycast or Alfred) already uses a combination, or another hotkey in Meet does, the settings window says so and keeps your previous combination. Record a different one.
 
+### Focus during calls
+
+Meet can turn on a macOS Focus while you're in a call, so notifications don't interrupt you or show up while you share your screen. macOS doesn't let apps set a Focus directly, so Meet runs two Shortcuts that you create:
+
+1. In the Shortcuts app, create a shortcut named "Turn On Meeting Focus" with the "Set Focus" action, set to turn your chosen Focus on.
+2. Create a second shortcut named "Turn Off Meeting Focus" with "Set Focus" set to turn the same Focus off.
+3. In Meet's settings, turn on "Turn on a Focus during calls". If you named the shortcuts differently, enter their names. Press Test to check both run.
+
+The Focus turns on once you're in the call (not in the pre-join screen) and turns off about 30 seconds after you leave, however you leave. Joining another call within those 30 seconds keeps the Focus on. Quitting Meet during a call turns the Focus off, and if Meet crashes during a call, it turns the Focus off the next time it opens.
+
+If a shortcut fails (for example, it was renamed), the menu bar menu says so. The call carries on regardless.
+
 ### Sharing your screen
 
 Click Meet's "Share screen" button and pick a screen or window. Stop sharing from Meet's own controls.
@@ -101,6 +114,7 @@ macOS only lets approved apps record the screen. The first time you share, Meet 
 - **A hotkey does nothing**: check you're in a call rather than in the pre-join screen. Check the settings window for a message saying another app owns the combination.
 - **Mute or camera hotkeys stopped working after a Meet update**: Google may have changed Meet's page. Please open an issue.
 - **A control is missing in a narrow window**: when Meet moves a button into its overflow menu, its hotkey can't reach it. Widen the window.
+- **The Focus doesn't turn on or off**: press Test in the Focus section of the settings window, which reports which shortcut failed. Check the names match the shortcuts in the Shortcuts app exactly.
 - **Screen sharing shows a permission message every time**: check Meet is turned on under System Settings > Privacy & Security > Screen & System Audio Recording, then quit and reopen Meet.
 
 ## Development

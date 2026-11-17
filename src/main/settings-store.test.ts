@@ -74,6 +74,24 @@ describe("loadSettings", () => {
     expect(settings.hotkeys["toggle-mute"]).toBe("Command+Shift+M");
   });
 
+  test("leaves the Focus Integration off until the user turns it on", () => {
+    expect(loadSettings(file).focus).toEqual({
+      enabled: false,
+      turnOnShortcut: "Turn On Meeting Focus",
+      turnOffShortcut: "Turn Off Meeting Focus",
+    });
+  });
+
+  test("keeps valid Focus settings and defaults the missing or malformed ones", () => {
+    writeFileSync(file, JSON.stringify({ focus: { enabled: true, turnOnShortcut: "Focus On", turnOffShortcut: 3 } }));
+
+    expect(loadSettings(file).focus).toEqual({
+      enabled: true,
+      turnOnShortcut: "Focus On",
+      turnOffShortcut: "Turn Off Meeting Focus",
+    });
+  });
+
   test("ignores hotkeys it does not know", () => {
     writeFileSync(file, JSON.stringify({ hotkeys: { "toggle-mini-mode": "Control+Alt+P" } }));
 
@@ -87,6 +105,7 @@ describe("saveSettings", () => {
       ...DEFAULT_SETTINGS,
       hotkeys: { ...DEFAULT_SETTINGS.hotkeys, "toggle-mute": "Command+Shift+M", "leave-call": null },
       alwaysOnTop: true,
+      focus: { enabled: true, turnOnShortcut: "Focus On", turnOffShortcut: "Focus Off" },
     };
 
     saveSettings(file, changed);

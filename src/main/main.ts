@@ -1,6 +1,10 @@
+import { join } from "node:path";
+
 import { app } from "electron";
 
 import { setAppMenu } from "./app-menu";
+import { focusIntegration, shortcutRunner } from "./focus-integration";
+import { fileLedger } from "./integration-ledger";
 import { startJoinPrompt } from "./join-prompt";
 import { connectMeetBridge } from "./meet-bridge";
 import { createMeetingController, type Command, type MeetingController } from "./meeting-controller";
@@ -55,18 +59,35 @@ if (!app.requestSingleInstanceLock()) {
       meetingController.command({ type: "close-window" }),
     );
 
-    const meetBridge = connectMeetBridge(meetingWindow.webContents, (signal) => meetingController.signal(signal));
-    const meetingController = createMeetingController({ meetBridge, meetingWindow });
-
     const sendCommand = (command: Command) => meetingController.command(command);
 
-    const settingsWindow = startSettings(meetingWindow, sendCommand);
+    const settingsWindow = startSettings(meetingWindow, sendCommand, () => focus.test());
 
     // Only now, so the window first appears with the saved settings applied, already on top if the user asked.
     meetingWindow.show();
 
     const joinPrompt = startJoinPrompt(sendCommand);
     const windows = { openSettings: () => settingsWindow.open(), openJoinPrompt: () => joinPrompt.open() };
+
+    const focus = focusIntegration(
+      () => settingsWindow.focus,
+      shortcutRunner(unpackagedOverride("MEET_DESKTOP_SHORTCUTS") ?? "shortcuts"),
+    );
+
+    const meetBridge = connectMeetBridge(meetingWindow.webContents, (signal) => meetingController.signal(signal));
+    const meetingController = createMeetingController({
+      meetBridge,
+      meetingWindow,
+      integrations: [focus],
+      ledger: fileLedger(join(app.getPath("userData"), "integration-ledger.json")),
+      clock: {
+        schedule(delayMs, callback) {
+          const timer = setTimeout(callback, delayMs);
+          return () => clearTimeout(timer);
+        },
+      },
+    });
+    restoreIntegrationsBeforeQuitting(meetingController);
 
     setAppMenu(windows);
     const menuBar = startMenuBar(meetingController, windows);
@@ -86,5 +107,24 @@ if (!app.requestSingleInstanceLock()) {
 
     app.on("activate", () => meetingWindow.show());
     app.on("second-instance", () => meetingWindow.show());
+  });
+}
+
+/**
+ * Holds off quitting until the Meeting Controller has restored the Integrations applied for a call.
+ */
+function restoreIntegrationsBeforeQuitting(meetingController: MeetingController): void {
+  let restored = false;
+
+  app.on("before-quit", (event) => {
+    if (restored) {
+      return;
+    }
+
+    event.preventDefault();
+    void meetingController.quit().finally(() => {
+      restored = true;
+      app.quit();
+    });
   });
 }

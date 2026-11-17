@@ -43,3 +43,7 @@ _Avoid_: Screen picker, share dialog
 **Integration**:
 A system side effect tied to being in a call, with an apply step and a restore step. The first two are the Focus Integration and the Slack Integration.
 _Avoid_: Plugin, hook
+
+**Integration Ledger**:
+A saved record of which Integrations are applied and the state each needs to restore. An entry is added once an Integration applies and removed once it restores, so entries found at launch mean the app crashed during a call, and are restored then.
+_Avoid_: Journal, restore log

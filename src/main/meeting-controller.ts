@@ -1,5 +1,12 @@
 import { isDeepStrictEqual } from "node:util";
 
+import {
+  startIntegrationLifecycle,
+  type Clock,
+  type Integration,
+  type IntegrationLedgerPort,
+} from "./integration-lifecycle";
+
 export type MeetingState =
   | { status: "idle" }
   | { status: "lobby" }
@@ -57,20 +64,41 @@ export interface MeetingController {
    */
   onStateChange(listener: (state: MeetingState) => void): void;
 
+  /**
+   * Describes, for the user, each Integration whose last apply or restore failed.
+   */
+  readonly integrationFailures: string[];
+
+  /**
+   * Calls `listener` with the new Integration failures each time they change.
+   */
+  onIntegrationFailuresChange(listener: (failures: string[]) => void): void;
+
   signal(signal: MeetSignal): void;
   command(command: Command): void;
+
+  /**
+   * Restores every applied Integration, resolving once they have all finished, so the app can quit.
+   */
+  quit(): Promise<void>;
 }
 
 /**
- * Creates the Meeting Controller, which owns the Meeting State: it takes in Meet Signals and Commands, and acts on
- * the Meet page and the Meeting Window through their ports.
+ * Creates the Meeting Controller, which owns the Meeting State: it takes in Meet Signals and Commands, acts on the Meet
+ * page and the Meeting Window through their ports, and applies Integrations while the user is in a call.
  */
 export function createMeetingController({
   meetBridge,
   meetingWindow,
+  integrations,
+  ledger,
+  clock,
 }: {
   meetBridge: MeetBridgePort;
   meetingWindow: MeetingWindowPort;
+  integrations: Integration[];
+  ledger: IntegrationLedgerPort;
+  clock: Clock;
 }): MeetingController {
   let status: MeetingState["status"] = "idle";
   let muted = false;
@@ -78,6 +106,8 @@ export function createMeetingController({
   let handRaised = false;
   let confirming = false;
   const listeners: Array<(state: MeetingState) => void> = [];
+
+  const integrationLifecycle = startIntegrationLifecycle({ integrations, ledger, clock });
 
   const state = (): MeetingState => (status === "in-call" ? { status, muted, cameraOn, handRaised } : { status });
 
@@ -131,6 +161,14 @@ export function createMeetingController({
       listeners.push(listener);
     },
 
+    get integrationFailures() {
+      return integrationLifecycle.failures;
+    },
+
+    onIntegrationFailuresChange(listener) {
+      integrationLifecycle.onFailuresChange(listener);
+    },
+
     signal(signal) {
       const before = state();
 
@@ -140,10 +178,12 @@ export function createMeetingController({
           break;
 
         case "entered-call":
+          integrationLifecycle.enteredCall();
           status = "in-call";
           break;
 
         case "left-call":
+          integrationLifecycle.leftCall();
           status = "idle";
           muted = false;
           cameraOn = true;
@@ -205,6 +245,10 @@ export function createMeetingController({
           void leaveOnceConfirmed();
           break;
       }
+    },
+
+    quit() {
+      return integrationLifecycle.quit();
     },
   };
 }
