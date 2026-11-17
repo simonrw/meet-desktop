@@ -46,7 +46,18 @@ jobs:
           npm version "$version" --no-git-tag-version
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      # Uploads to a draft Release, which a re-run of the same run number reuses.
+      # electron-builder uploads both architectures at once, and each creates its own draft if none exists yet. A re-run of
+      # the same run number reuses the draft. GitHub's release-by-tag lookup skips drafts, so it's found in the list.
+      - name: Create the draft Release
+        run: |
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"v$VERSION\") | .id")"
+          if [ -z "$existing" ]; then
+            gh release create "v$VERSION" --draft --title "$VERSION" --notes "" --target "$GITHUB_SHA"
+          fi
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Package, sign and upload
         run: |
           npm run build
