@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { _electron as electron, type ElectronApplication } from "@playwright/test";
+import { _electron as electron, expect, type ElectronApplication } from "@playwright/test";
 
 /**
  * Serves the stub Meet page on a random local port and returns its origin.
@@ -137,18 +137,35 @@ export function answerNextQuestion(app: ElectronApplication, button?: string): P
 }
 
 /**
- * Calls `method` on the Meeting Window, Full or mini, whichever is showing the Meet page.
+ * Calls `method` on the Meeting Window, Full or mini, whichever is showing the Meet page. Waits for the stub Meet page
+ * to load first, since the window is found by its page's title.
  */
-export function onMeetingWindow(app: ElectronApplication, method: "isVisible" | "hide" | "close"): Promise<unknown> {
-  return app.evaluate(
-    ({ BaseWindow, WebContentsView }, method) => {
-      const window = BaseWindow.getAllWindows().find((window) => {
-        const content = window.contentView;
-        return content instanceof WebContentsView && content.webContents.getTitle() === "Stub Meet";
-      });
+export async function onMeetingWindow(
+  app: ElectronApplication,
+  method: "isVisible" | "hide" | "close",
+): Promise<unknown> {
+  let result: { found: boolean; value?: unknown } = { found: false };
 
-      return window?.[method]();
-    },
-    method,
-  );
+  await expect
+    .poll(
+      async () => {
+        result = await app.evaluate(
+          ({ BaseWindow, WebContentsView }, method) => {
+            const window = BaseWindow.getAllWindows().find((window) => {
+              const content = window.contentView;
+              return content instanceof WebContentsView && content.webContents.getTitle() === "Stub Meet";
+            });
+
+            return window ? { found: true, value: window[method]() } : { found: false };
+          },
+          method,
+        );
+
+        return result.found;
+      },
+      { message: "a window shows the stub Meet page" },
+    )
+    .toBe(true);
+
+  return result.value;
 }
