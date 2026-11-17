@@ -106,13 +106,13 @@ macOS only lets approved apps record the screen. The first time you share, Meet 
 
 ### Updates
 
-Meet checks for a new version when it opens and every hour after, and downloads it in the background. The new version installs the next time you quit Meet.
+Meet checks for an Update when it opens and every hour after, and downloads it in the background. The Update installs the next time you quit Meet.
 
-Once a new version has downloaded, the menu bar menu shows Restart to Update with the version number. Choose it to install the new version now: Meet quits, turns off the Focus if it's still on from a call, and opens again on the new version. Restart to Update is greyed out during a call, and Meet never restarts by itself, so an update never interrupts a call.
+Once an Update has downloaded, the menu bar menu shows Restart to Update with its version number. Choose it to install the Update now: Meet quits, turns off the Focus if it's still on from a call, and opens again on the new version. Restart to Update is greyed out during a call, and Meet never restarts by itself, so an Update never interrupts a call.
 
-To check straight away, choose Check for Updates… in the Meet menu. It tells you if you're on the latest version, starts downloading a new one, or offers to restart to install one that has already downloaded.
+To check straight away, choose Check for Updates… in the Meet menu. It tells you if you're on the latest version, starts downloading an Update, or offers to restart to install one that has already downloaded.
 
-Copies run with `npm start` never check for updates.
+Copies run with `npm start` never check for Updates.
 
 ## Troubleshooting
 
@@ -139,6 +139,31 @@ npm run package      # build Meet.app
 
 Each push to `main` runs the [release workflow](.github/workflows/release.yml), which runs the typecheck and tests, then builds, signs and publishes a Release. Releases are numbered `<major>.<minor>.<run number>`, with major and minor from `package.json`, so bump those to mark a big change. You can also start the workflow by hand from the Actions tab.
 
-Releases are signed with a self-signed certificate. Its `.p12` and password live in 1Password and in the repository secrets `CSC_LINK` and `CSC_KEY_PASSWORD`, and `build/sign.js` pins its SHA-1. Replacing it means every user reinstalls Meet and grants its permissions again.
+Releases are signed with a self-signed certificate. Its `.p12` and password live in 1Password and in the repository secrets `CSC_LINK` and `CSC_KEY_PASSWORD`, and `build/sign.js` pins its SHA-1. Replacing it means every user reinstalls Meet and grants its permissions again, so only create a new one if the old one is lost:
+
+```sh
+cat > cert.cnf <<'EOF'
+[req]
+distinguished_name = dn
+prompt = no
+x509_extensions = ext
+[dn]
+CN = Meet Desktop Release Signing
+[ext]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature
+extendedKeyUsage = critical, codeSigning
+subjectKeyIdentifier = hash
+EOF
+
+# Valid for 30 years. macOS's `security import` rejects a .p12 exported without -legacy.
+openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 10950 -config cert.cnf
+openssl pkcs12 -export -legacy -inkey key.pem -in cert.pem -name "Meet Desktop Release Signing" -out meet-signing.p12
+
+# The SHA-1 to pin in build/sign.js
+openssl x509 -in cert.pem -noout -fingerprint -sha1 | cut -d= -f2 | tr -d : | tr A-F a-f
+```
+
+Then set the repository secret `CSC_LINK` to the output of `base64 < meet-signing.p12 | tr -d '\n'` and `CSC_KEY_PASSWORD` to the export password. Store `meet-signing.p12`, its password and `key.pem` in 1Password, and delete the local copies.
 
 Before a release, run through [docs/release-smoke-checklist.md](docs/release-smoke-checklist.md) against real Google Meet.
