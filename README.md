@@ -20,14 +20,9 @@ Google Meet in its own macOS window, with system-wide hotkeys to control the cal
 
 ## Install
 
-There are no prebuilt releases yet, so build the app from source. You need [Node.js](https://nodejs.org/) (the version is pinned in `mise.toml`).
-
-```sh
-npm install
-npm run package
-```
-
-The app is written to `release/mac-arm64/Meet.app` (or `release/mac/Meet.app` on Intel). Drag it into `/Applications`.
+1. Download the disk image from the [latest Release](https://github.com/simonrw/meet-desktop/releases/latest): `Meet-<version>-arm64.dmg` for Apple Silicon, or `Meet-<version>.dmg` for Intel.
+2. Open the disk image and drag Meet into `/Applications`. Open Meet from `/Applications`, not from the disk image.
+3. The first time, macOS says it can't check Meet for malicious software, because Releases aren't notarized. Click Done, open System Settings > Privacy & Security, and click "Open Anyway" next to the message about Meet. You only need to do this once.
 
 ## Using Meet
 
@@ -119,11 +114,21 @@ macOS only lets approved apps record the screen. The first time you share, Meet 
 
 ## Development
 
+You need [Node.js](https://nodejs.org/) (the version is pinned in `mise.toml`).
+
 ```sh
+npm install
 npm start            # build and run
 npm test             # unit tests
 npm run test:e2e     # end-to-end tests against a stub Meet page
 npm run typecheck
+npm run package      # build Meet.app
 ```
+
+`npm run package` writes the app to `release/mac-arm64/Meet.app` (or `release/mac/Meet.app` on Intel). Copies built this way are signed ad-hoc, so they never update to a Release. Install from a Release's disk image to get Updates.
+
+Each push to `main` runs the [release workflow](.github/workflows/release.yml), which runs the typecheck and tests, then builds, signs and publishes a Release. Releases are numbered `<major>.<minor>.<run number>`, with major and minor from `package.json`, so bump those to mark a big change. You can also start the workflow by hand from the Actions tab.
+
+Releases are signed with a self-signed certificate. Its `.p12` and password live in 1Password and in the repository secrets `CSC_LINK` and `CSC_KEY_PASSWORD`, and `build/sign.js` pins its SHA-1. Replacing it means every user reinstalls Meet and grants its permissions again.
 
 Before a release, run through [docs/release-smoke-checklist.md](docs/release-smoke-checklist.md) against real Google Meet.
