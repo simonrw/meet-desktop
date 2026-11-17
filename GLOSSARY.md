@@ -47,3 +47,11 @@ _Avoid_: Plugin, hook
 **Integration Ledger**:
 A saved record of which Integrations are applied and the state each needs to restore. An entry is added as an Integration starts to apply and removed once it restores, so entries found at launch mean the app crashed during a call, and are restored then.
 _Avoid_: Journal, restore log
+
+**Release**:
+A build of `main` published on GitHub Releases, numbered `major.minor.patch` with the patch taken from the release workflow's run number.
+_Avoid_: Build, version (for the published artifact)
+
+**Update**:
+A Release newer than the running app, which the app downloads in the background and installs when the user quits or restarts to update.
+_Avoid_: Upgrade, patch, OTA update

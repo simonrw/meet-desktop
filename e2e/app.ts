@@ -30,12 +30,24 @@ export function newUserData(): string {
 }
 
 /**
+ * What the fake update source says the latest Release is: a version, or an error to fail checks with.
+ */
+export type LatestRelease = { version: string } | { error: string };
+
+/**
  * Launches the built app against the given Meet origin, with a throwaway user data directory unless given one.
  *
  * The app runs Shortcuts through a fake `shortcuts` command, so tests never run the user's real ones. The fake logs
  * each run for `shortcutsRun`, and fails for Shortcut names starting with "Missing".
+ *
+ * Given `latestRelease`, the app looks for Updates through a fake update source, which logs each install for
+ * `updatesInstalled`. Otherwise it never looks for Updates.
  */
-export async function launchApp(meetOrigin: string, userData = newUserData()): Promise<ElectronApplication> {
+export async function launchApp(
+  meetOrigin: string,
+  userData = newUserData(),
+  latestRelease?: LatestRelease,
+): Promise<ElectronApplication> {
   const fakeShortcuts = join(userData, "fake-shortcuts");
   writeFileSync(
     fakeShortcuts,
@@ -48,15 +60,32 @@ esac
     { mode: 0o755 },
   );
 
+  const { MEET_DESKTOP_UPDATES: _, ...env } = process.env as Record<string, string>;
+
+  if (latestRelease !== undefined) {
+    env.MEET_DESKTOP_UPDATES = join(userData, "latest-release.json");
+    writeFileSync(env.MEET_DESKTOP_UPDATES, JSON.stringify(latestRelease));
+  }
+
   return electron.launch({
     args: ["."],
     env: {
-      ...process.env,
+      ...env,
       MEET_DESKTOP_MEET_ORIGIN: meetOrigin,
       MEET_DESKTOP_USER_DATA: userData,
       MEET_DESKTOP_SHORTCUTS: fakeShortcuts,
     },
   });
+}
+
+/**
+ * Lists the version of each Update installed through the fake update source by apps launched with this user data
+ * directory.
+ */
+export function updatesInstalled(userData: string): string[] {
+  const log = join(userData, "installed-updates.log");
+
+  return existsSync(log) ? readFileSync(log, "utf8").trimEnd().split("\n") : [];
 }
 
 /**

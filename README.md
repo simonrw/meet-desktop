@@ -104,6 +104,14 @@ macOS only lets approved apps record the screen. The first time you share, Meet 
 - During a call, closing the window asks whether to leave first. Choosing Cancel keeps the window open and the call going.
 - Quit with Cmd+Q or Quit Meet in the menu bar menu. Hotkeys stop working once Meet has quit.
 
+### Updates
+
+Meet checks for a new version when it opens and every hour after, and downloads it in the background. The new version installs the next time you quit Meet.
+
+Once a new version has downloaded, the menu bar menu shows Restart to Update with the version number. Choose it to install the new version now: Meet quits, turns off the Focus if it's still on from a call, and opens again on the new version. Restart to Update is greyed out during a call, and Meet never restarts by itself, so an update never interrupts a call.
+
+Copies run with `npm start` never check for updates.
+
 ## Troubleshooting
 
 - **A hotkey does nothing**: check you're in a call rather than in the pre-join screen. Check the settings window for a message saying another app owns the combination.
