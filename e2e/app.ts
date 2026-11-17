@@ -67,3 +67,20 @@ export function shortcutsRun(userData: string): string[] {
 
   return existsSync(log) ? readFileSync(log, "utf8").trimEnd().split("\n") : [];
 }
+
+/**
+ * Calls `method` on the Meeting Window, Full or mini, whichever is showing the Meet page.
+ */
+export function onMeetingWindow(app: ElectronApplication, method: "isVisible" | "hide" | "close"): Promise<unknown> {
+  return app.evaluate(
+    ({ BaseWindow, WebContentsView }, method) => {
+      const window = BaseWindow.getAllWindows().find((window) => {
+        const content = window.contentView;
+        return content instanceof WebContentsView && content.webContents.getTitle() === "Stub Meet";
+      });
+
+      return window?.[method]();
+    },
+    method,
+  );
+}

@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
-import { launchApp, startStubMeet } from "./app";
+import { launchApp, onMeetingWindow, startStubMeet } from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
 let app: ElectronApplication;
@@ -62,12 +62,7 @@ async function join(prompt: Page, input: string) {
 }
 
 function meetingWindowVisible() {
-  return app.evaluate(({ webContents, BaseWindow }) => {
-    const meeting = webContents.getAllWebContents().find((contents) => contents.getTitle() === "Stub Meet");
-    return BaseWindow.getAllWindows().some(
-      (window) => window.isVisible() && (window.contentView as Electron.WebContentsView).webContents === meeting,
-    );
-  });
+  return onMeetingWindow(app, "isVisible");
 }
 
 function windowCount() {
@@ -131,7 +126,7 @@ test("a Meet link opens that meeting's pre-join screen", async () => {
 });
 
 test("joining brings back a hidden Meeting Window", async () => {
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.hide());
+  await onMeetingWindow(app, "hide");
   const prompt = await fromMenuBar();
 
   await join(prompt, "abc-defg-hij");
@@ -201,7 +196,7 @@ test("joining during a call switches meetings once the user confirms", async () 
 });
 
 test("opening a meet-desktop URL opens the meeting in a hidden Meeting Window", async () => {
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.hide());
+  await onMeetingWindow(app, "hide");
 
   await app.evaluate(({ app }) => app.emit("open-url", { preventDefault() {} }, "meet-desktop://abc-defg-hij"));
 

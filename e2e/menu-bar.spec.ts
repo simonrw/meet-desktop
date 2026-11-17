@@ -1,6 +1,6 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
-import { launchApp, startStubMeet } from "./app";
+import { launchApp, onMeetingWindow, startStubMeet } from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
 let app: ElectronApplication;
@@ -32,7 +32,7 @@ function click(id: string) {
 }
 
 function meetingWindowVisible() {
-  return app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible());
+  return onMeetingWindow(app, "isVisible");
 }
 
 async function joinCall() {
@@ -91,7 +91,7 @@ test("the camera item toggles Meet's camera", async () => {
 });
 
 test("the show window item brings back a hidden Meeting Window", async () => {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.hide());
+  await onMeetingWindow(app, "hide");
 
   await click("show-window");
 

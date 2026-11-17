@@ -7,5 +7,6 @@ A frameless window can't be dragged by its content, and Meet's page isn't ours t
 ## Consequences
 
 - The Meeting Window is a `BaseWindow`, not a `BrowserWindow`, so `BrowserWindow.getAllWindows()` and `BrowserWindow.fromWebContents` don't find it. End-to-end tests reach it through `BaseWindow.getAllWindows()`, and screen sharing is handed the window to show the Source Picker over.
+- Closing a `BaseWindow` leaves its views' pages running, and one still loading holds up quitting, so the Meeting Window closes them when their window closes.
 - The handle is a page of its own, so end-to-end tests see it as an extra window once Mini Mode has been entered.
 - Moving a window while Playwright sends mouse input hangs the test, so dragging the handle is checked by hand in the release smoke checklist.

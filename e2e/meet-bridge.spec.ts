@@ -1,7 +1,7 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 
 import type { PlainCommand } from "../src/main/meeting-controller";
-import { launchApp, startStubMeet } from "./app";
+import { launchApp, onMeetingWindow, startStubMeet } from "./app";
 
 let meet: Awaited<ReturnType<typeof startStubMeet>>;
 let app: ElectronApplication;
@@ -36,7 +36,7 @@ function answerLeaveConfirmations(confirmed: boolean) {
 }
 
 function meetingWindowVisible() {
-  return app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.isVisible());
+  return onMeetingWindow(app, "isVisible");
 }
 
 // The stub starts every meeting with the microphone on, the camera off and the hand down.
@@ -89,7 +89,7 @@ test("muting with Meet's own button is reflected in the Meeting State", async ()
 
 test("the toggle mute Command toggles Meet's microphone, even with the Meeting Window hidden", async () => {
   await joinCall();
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.hide());
+  await onMeetingWindow(app, "hide");
 
   await send("toggle-mute");
 
@@ -157,7 +157,7 @@ test("the toggle camera Command does nothing in the lobby", async () => {
 });
 
 test("the show window Command brings back a hidden Meeting Window", async () => {
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.hide());
+  await onMeetingWindow(app, "hide");
 
   await send("show-window");
 
@@ -188,7 +188,7 @@ test("closing the Meeting Window during a call leaves and hides once confirmed",
   await answerLeaveConfirmations(true);
   await joinCall();
 
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.close());
+  await onMeetingWindow(app, "close");
 
   await expect.poll(meetingState).toEqual({ status: "idle" });
   await expect.poll(meetingWindowVisible).toBe(false);
@@ -198,7 +198,7 @@ test("closing the Meeting Window during a call keeps it open when cancelled", as
   await answerLeaveConfirmations(false);
   await joinCall();
 
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.close());
+  await onMeetingWindow(app, "close");
   await send("toggle-hand");
 
   await expect.poll(meetingState).toEqual(inCall({ handRaised: true }));
@@ -206,7 +206,7 @@ test("closing the Meeting Window during a call keeps it open when cancelled", as
 });
 
 test("closing the Meeting Window outside a call hides it without asking", async () => {
-  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.close());
+  await onMeetingWindow(app, "close");
 
   await expect.poll(meetingWindowVisible).toBe(false);
 });

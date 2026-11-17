@@ -122,6 +122,9 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
   const onClose = () => onCommand({ type: "close-window" });
   interceptClose(full, onClose);
 
+  // Unlike a BrowserWindow's page, a view's page outlives its window, and one still loading holds up quitting.
+  full.once("closed", () => meetView.webContents.close());
+
   meetView.webContents.loadURL(meetOrigin);
 
   const enterMini = () => {
@@ -264,6 +267,8 @@ function createMiniWindow(boundsFile: string, opacity: number, onDoubleClick: ()
       onDoubleClick();
     }
   });
+
+  window.once("closed", () => handle.webContents.close());
 
   return { window, handle, saveBounds: rememberBounds(window, boundsFile) };
 }
