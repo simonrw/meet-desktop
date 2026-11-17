@@ -36,14 +36,14 @@ export interface MeetingWindow extends MeetingWindowPort {
   readonly webContents: WebContents;
 
   /**
-   * Sets whether the Full window floats above other apps' windows, on the current Space only.
+   * Sets whether the window floats above other apps' windows, on the current Space only.
    */
   keepOnTop(onTop: boolean): void;
 }
 
 /**
- * Opens the Meeting Window: Meet hosted in a dedicated persistent session, which remembers its bounds. Closing the
- * window calls `onCloseRequested` in place of closing it, until the app quits.
+ * Creates the Meeting Window, hidden until `show` is called: Meet hosted in a dedicated persistent session, which
+ * remembers its bounds. Closing the window calls `onCloseRequested` in place of closing it, until the app quits.
  */
 export function createMeetingWindow(meetOrigin: string, onCloseRequested: () => void): MeetingWindow {
   const meetSession = session.fromPartition(PARTITION);
@@ -55,6 +55,7 @@ export function createMeetingWindow(meetOrigin: string, onCloseRequested: () => 
   const window = new BrowserWindow({
     ...(loadBounds(boundsFile, workAreas) ?? DEFAULT_SIZE),
     title: "Meet",
+    show: false,
     webPreferences: { session: meetSession, sandbox: true, contextIsolation: true, preload: MEET_BRIDGE_PRELOAD },
   });
 

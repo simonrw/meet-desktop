@@ -41,6 +41,10 @@ if (!app.requestSingleInstanceLock()) {
     const meetingController = createMeetingController({ meetBridge, meetingWindow });
 
     const settingsWindow = startSettings(meetingWindow, (command) => meetingController.command(command));
+
+    // Only now, so the window first appears with the saved settings applied, already on top if the user asked.
+    meetingWindow.show();
+
     setAppMenu(() => settingsWindow.open());
     const menuBar = startMenuBar(meetingController, () => settingsWindow.open());
 
