@@ -48,6 +48,32 @@ describe("loadSettings", () => {
     expect(hotkeys["toggle-hand"]).toBe("Control+Alt+H");
   });
 
+  test("leaves the Meeting Window off top by default", () => {
+    expect(loadSettings(file).alwaysOnTop).toBe(false);
+  });
+
+  test("leaves the Meeting Window off top when the settings file is corrupt", () => {
+    writeFileSync(file, "{ not json");
+
+    expect(loadSettings(file).alwaysOnTop).toBe(false);
+  });
+
+  test("loads a saved keep window on top option", () => {
+    writeFileSync(file, JSON.stringify({ alwaysOnTop: true }));
+
+    expect(loadSettings(file).alwaysOnTop).toBe(true);
+  });
+
+  test("defaults a malformed keep window on top option without affecting the saved hotkeys", () => {
+    writeFileSync(file, JSON.stringify({ alwaysOnTop: "yes", hotkeys: { "toggle-mute": "Command+Shift+M" } }));
+
+    const settings = loadSettings(file);
+
+    expect(settings.alwaysOnTop).toBe(false);
+
+    expect(settings.hotkeys["toggle-mute"]).toBe("Command+Shift+M");
+  });
+
   test("ignores hotkeys it does not know", () => {
     writeFileSync(file, JSON.stringify({ hotkeys: { "toggle-mini-mode": "Control+Alt+P" } }));
 
@@ -60,6 +86,7 @@ describe("saveSettings", () => {
     const changed = {
       ...DEFAULT_SETTINGS,
       hotkeys: { ...DEFAULT_SETTINGS.hotkeys, "toggle-mute": "Command+Shift+M", "leave-call": null },
+      alwaysOnTop: true,
     };
 
     saveSettings(file, changed);

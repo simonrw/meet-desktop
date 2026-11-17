@@ -5,7 +5,7 @@ A macOS desktop app that hosts Google Meet in its own window and ties the rest o
 ## Language
 
 **Meeting Window**:
-The app window hosting Meet. It has two presentations: **Full** and **Mini Mode**, a compact always-on-top window that floats over other apps.
+The app window hosting Meet. It has two presentations: **Full** and **Mini Mode**, a compact always-on-top window that floats over other apps. The user can also keep the Full presentation on top of other apps' windows with the "Keep window on top" setting.
 _Avoid_: Main window, browser window, PiP
 
 **Meeting State**:

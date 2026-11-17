@@ -7,6 +7,9 @@ export type HotkeyName = "toggle-mute" | "toggle-camera" | "toggle-hand" | "show
  */
 export interface Settings {
   hotkeys: Record<HotkeyName, string | null>;
+
+  /** Whether the Meeting Window floats above other apps' windows. */
+  alwaysOnTop: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -17,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
     "show-window": "Control+Alt+S",
     "leave-call": "Control+Alt+L",
   },
+  alwaysOnTop: false,
 };
 
 export const HOTKEY_NAMES = Object.keys(DEFAULT_SETTINGS.hotkeys) as HotkeyName[];
@@ -32,7 +36,11 @@ export function loadSettings(file: string): Settings {
     return DEFAULT_SETTINGS;
   }
 
-  const savedHotkeys = isRecord(saved) && isRecord(saved.hotkeys) ? saved.hotkeys : {};
+  if (!isRecord(saved)) {
+    return DEFAULT_SETTINGS;
+  }
+
+  const savedHotkeys = isRecord(saved.hotkeys) ? saved.hotkeys : {};
 
   const hotkeys = { ...DEFAULT_SETTINGS.hotkeys };
   for (const name of HOTKEY_NAMES) {
@@ -42,7 +50,9 @@ export function loadSettings(file: string): Settings {
     }
   }
 
-  return { hotkeys };
+  const alwaysOnTop = typeof saved.alwaysOnTop === "boolean" ? saved.alwaysOnTop : DEFAULT_SETTINGS.alwaysOnTop;
+
+  return { hotkeys, alwaysOnTop };
 }
 
 /**
