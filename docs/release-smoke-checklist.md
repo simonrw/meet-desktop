@@ -51,6 +51,14 @@ The default leave hotkey is Control+Option+L.
 - [ ] Rejoin from that screen: the mute hotkey works again.
 - [ ] Return to the Meet home screen: the mute hotkey does nothing.
 
+## Menu bar
+
+- [ ] Outside a call, the menu bar shows an outlined microphone that is legible in both a light and a dark menu bar (switch System Settings > Appearance). In its menu, Mute, Turn Off Camera and Leave Call… are greyed out.
+- [ ] Join a call: the icon fills in. Mute with Meet's own button, then with the hotkey, then from the menu: the icon is crossed out while muted and filled while unmuted.
+- [ ] Close the Meeting Window, then use Turn Off Camera and Show Window from the menu: the camera toggles in Meet and the window comes back.
+- [ ] Choose Leave Call… from the menu: the window comes forward asking "Leave the call?". Choose Leave: the icon goes back to outlined.
+- [ ] Settings… opens the settings window, and Quit Meet quits the app.
+
 ## Settings
 
 - [ ] Press Cmd+, in the app: the settings window opens, listing each hotkey's combination.

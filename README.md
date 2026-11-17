@@ -5,6 +5,7 @@ Google Meet in its own macOS window, with system-wide hotkeys to control the cal
 ## Features
 
 - **Its own window**: Meet runs in a dedicated window with its own Google login, kept separate from your browser profile. The login survives relaunches, and the window remembers its size and position.
+- **Menu bar item**: a microphone icon in the menu bar shows whether you're in a call and whether you're muted, and its menu controls the call.
 - **Global hotkeys**: mute, toggle the camera, raise your hand, bring the window forward or leave the call, whichever app is focused.
 - **Screen sharing**: pick a whole screen or a single window to share from the app's own picker.
 - **Safe closing**: closing the window during a call asks before leaving. Outside a call, closing just hides the window.
@@ -48,9 +49,19 @@ The hotkeys stay in step with Meet: if you mute with Meet's own button, the mute
 
 Leave call brings the window forward and asks "Leave the call?" before hanging up. Pressing Return cancels, so a stray keypress while typing in another app won't end the call.
 
+### Menu bar
+
+The microphone icon in the menu bar shows where you are:
+
+- **Outlined**: not in a call.
+- **Filled**: in a call.
+- **Crossed out**: in a call and muted.
+
+Click it for Mute, Turn Off Camera, Show Window, Leave Call…, Settings… and Quit Meet. Mute, camera and Leave Call are greyed out outside a call. Leave Call asks before hanging up, as the hotkey does. The menu works while the window is hidden.
+
 ### Settings
 
-Open settings with Cmd+, (or Meet > Settings…). Changes take effect straight away.
+Open settings with Cmd+, (or Meet > Settings…, or Settings… in the menu bar menu). Changes take effect straight away.
 
 - **Change a hotkey**: click Record, then press the new combination. Press Escape to cancel.
 - **Turn off a hotkey**: click Turn off to free its combination for other apps. Record a combination to turn it back on.
@@ -66,9 +77,9 @@ macOS only lets approved apps record the screen. The first time you share, Meet 
 
 ### Closing and quitting
 
-- Closing the window hides it. Bring it back from the Dock, or with the show window hotkey.
+- Closing the window hides it. Bring it back from the Dock, the menu bar menu or the show window hotkey.
 - During a call, closing the window asks whether to leave first. Choosing Cancel keeps the window open and the call going.
-- Quit with Cmd+Q. Hotkeys stop working once Meet has quit.
+- Quit with Cmd+Q or Quit Meet in the menu bar menu. Hotkeys stop working once Meet has quit.
 
 ## Troubleshooting
 

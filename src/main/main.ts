@@ -4,11 +4,15 @@ import { setAppMenu } from "./app-menu";
 import { connectMeetBridge } from "./meet-bridge";
 import { createMeetingController, type MeetingController } from "./meeting-controller";
 import { createMeetingWindow } from "./meeting-window";
+import { startMenuBar, type MenuBar } from "./menu-bar";
 import { startSettings } from "./settings";
 
 declare global {
   // Lets end-to-end tests read the Meeting State and send Commands. Set in unpackaged builds only.
   var meetingController: MeetingController | undefined;
+
+  // Lets end-to-end tests read the menu bar icon and click its menu. Set in unpackaged builds only.
+  var menuBar: MenuBar | undefined;
 }
 
 const MEET_ORIGIN = "https://meet.google.com";
@@ -38,9 +42,11 @@ if (!app.requestSingleInstanceLock()) {
 
     const settingsWindow = startSettings((command) => meetingController.command(command));
     setAppMenu(() => settingsWindow.open());
+    const menuBar = startMenuBar(meetingController, () => settingsWindow.open());
 
     if (!app.isPackaged) {
       globalThis.meetingController = meetingController;
+      globalThis.menuBar = menuBar;
     }
 
     app.on("activate", () => meetingWindow.show());

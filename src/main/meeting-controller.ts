@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 export type MeetingState =
   | { status: "idle" }
   | { status: "lobby" }
@@ -34,6 +36,12 @@ export interface MeetingWindowPort {
 
 export interface MeetingController {
   readonly state: MeetingState;
+
+  /**
+   * Calls `listener` with the new Meeting State each time it changes.
+   */
+  onStateChange(listener: (state: MeetingState) => void): void;
+
   signal(signal: MeetSignal): void;
   command(command: Command): void;
 }
@@ -54,6 +62,9 @@ export function createMeetingController({
   let cameraOn = true;
   let handRaised = false;
   let confirmingLeave = false;
+  const listeners: Array<(state: MeetingState) => void> = [];
+
+  const state = (): MeetingState => (status === "in-call" ? { status, muted, cameraOn, handRaised } : { status });
 
   /**
    * Leaves the call if the user agrees to, resolving to whether they agreed.
@@ -84,10 +95,16 @@ export function createMeetingController({
 
   return {
     get state() {
-      return status === "in-call" ? { status, muted, cameraOn, handRaised } : { status };
+      return state();
+    },
+
+    onStateChange(listener) {
+      listeners.push(listener);
     },
 
     signal(signal) {
+      const before = state();
+
       switch (signal.type) {
         case "entered-lobby":
           status = "lobby";
@@ -115,6 +132,11 @@ export function createMeetingController({
         case "hand-changed":
           handRaised = signal.handRaised;
           break;
+      }
+
+      const after = state();
+      if (!isDeepStrictEqual(before, after)) {
+        listeners.forEach((listener) => listener(after));
       }
     },
 

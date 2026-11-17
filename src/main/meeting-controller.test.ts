@@ -6,6 +6,7 @@ function setup() {
   const bridgeActions: string[] = [];
   const windowActions: string[] = [];
   const pendingConfirmations: Array<(confirmed: boolean) => void> = [];
+  const announcedStates: unknown[] = [];
 
   const controller = createMeetingController({
     meetBridge: {
@@ -20,6 +21,7 @@ function setup() {
       confirmLeave: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
     },
   });
+  controller.onStateChange((state) => announcedStates.push(state));
 
   /**
    * Answers the oldest leave confirmation still on screen, and waits for the controller to act on the answer.
@@ -30,7 +32,7 @@ function setup() {
     await new Promise((resolve) => setTimeout(resolve));
   }
 
-  return { controller, bridgeActions, windowActions, pendingConfirmations, answerConfirmation };
+  return { controller, bridgeActions, windowActions, pendingConfirmations, announcedStates, answerConfirmation };
 }
 
 function inCall(overrides: { muted?: boolean; cameraOn?: boolean; handRaised?: boolean } = {}) {
@@ -135,6 +137,37 @@ describe("Meeting State", () => {
     controller.signal({ type: "entered-call" });
 
     expect(controller.state).toEqual(inCall({ muted: true, cameraOn: false }));
+  });
+});
+
+describe("Meeting State changes", () => {
+  test("are announced to listeners as the user enters a call, mutes, unmutes and leaves", () => {
+    const { controller, announcedStates } = setup();
+
+    controller.signal({ type: "entered-lobby" });
+    controller.signal({ type: "entered-call" });
+    controller.signal({ type: "mute-changed", muted: true });
+    controller.signal({ type: "mute-changed", muted: false });
+    controller.signal({ type: "left-call" });
+
+    expect(announcedStates).toEqual([
+      { status: "lobby" },
+      inCall(),
+      inCall({ muted: true }),
+      inCall(),
+      { status: "idle" },
+    ]);
+  });
+
+  test("are not announced when a signal leaves the Meeting State as it was", () => {
+    const { controller, announcedStates } = setup();
+
+    controller.signal({ type: "left-call" });
+    controller.signal({ type: "entered-call" });
+    controller.signal({ type: "entered-call" });
+    controller.signal({ type: "mute-changed", muted: false });
+
+    expect(announcedStates).toEqual([inCall()]);
   });
 });
 
