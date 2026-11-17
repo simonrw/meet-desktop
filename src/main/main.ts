@@ -12,6 +12,7 @@ import { parseMeetingCode, URL_SCHEME } from "./meeting-link";
 import { createMeetingWindow } from "./meeting-window";
 import { startMenuBar, type MenuBar } from "./menu-bar";
 import { startSettings } from "./settings";
+import type { Settings } from "./settings-store";
 
 declare global {
   // Lets end-to-end tests read the Meeting State and send Commands. Set in unpackaged builds only.
@@ -55,13 +56,17 @@ if (!app.requestSingleInstanceLock()) {
   }
 
   app.whenReady().then(() => {
-    const meetingWindow = createMeetingWindow(unpackagedOverride("MEET_DESKTOP_MEET_ORIGIN") ?? MEET_ORIGIN, () =>
-      meetingController.command({ type: "close-window" }),
-    );
-
     const sendCommand = (command: Command) => meetingController.command(command);
 
-    const settingsWindow = startSettings(meetingWindow, sendCommand, () => focus.test());
+    const settingsWindow = startSettings(sendCommand, () => focus.test());
+    const meetingWindow = createMeetingWindow(unpackagedOverride("MEET_DESKTOP_MEET_ORIGIN") ?? MEET_ORIGIN, sendCommand);
+
+    const applySettings = (settings: Settings) => {
+      meetingWindow.setMiniOpacity(settings.miniModeOpacity);
+      meetingWindow.keepOnTop(settings.alwaysOnTop);
+    };
+    applySettings(settingsWindow.settings);
+    settingsWindow.onChange(applySettings);
 
     // Only now, so the window first appears with the saved settings applied, already on top if the user asked.
     meetingWindow.show();
@@ -70,7 +75,7 @@ if (!app.requestSingleInstanceLock()) {
     const windows = { openSettings: () => settingsWindow.open(), openJoinPrompt: () => joinPrompt.open() };
 
     const focus = focusIntegration(
-      () => settingsWindow.focus,
+      () => settingsWindow.settings.focus,
       shortcutRunner(unpackagedOverride("MEET_DESKTOP_SHORTCUTS") ?? "shortcuts"),
     );
 
@@ -86,6 +91,7 @@ if (!app.requestSingleInstanceLock()) {
           return () => clearTimeout(timer);
         },
       },
+      autoMiniMode: () => settingsWindow.settings.autoMiniMode,
     });
     restoreIntegrationsBeforeQuitting(meetingController);
 
@@ -106,6 +112,7 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     app.on("activate", () => meetingWindow.show());
+    app.on("did-resign-active", () => meetingController.switchedAway());
     app.on("second-instance", () => meetingWindow.show());
   });
 }

@@ -1,6 +1,12 @@
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
-export type HotkeyName = "toggle-mute" | "toggle-camera" | "toggle-hand" | "show-window" | "leave-call";
+export type HotkeyName =
+  | "toggle-mute"
+  | "toggle-camera"
+  | "toggle-hand"
+  | "show-window"
+  | "leave-call"
+  | "toggle-mini-mode";
 
 /**
  * The Focus Integration's settings: whether it runs, and the names of the Shortcuts that turn the Focus on and off.
@@ -21,7 +27,16 @@ export interface Settings {
   alwaysOnTop: boolean;
 
   focus: FocusSettings;
+
+  /** Whether to enter Mini Mode when the user switches to another app during a call. */
+  autoMiniMode: boolean;
+
+  /** The mini window's opacity, from `MIN_MINI_MODE_OPACITY` to 1. */
+  miniModeOpacity: number;
 }
+
+// Any fainter and the call can't be made out.
+export const MIN_MINI_MODE_OPACITY = 0.3;
 
 export const DEFAULT_SETTINGS: Settings = {
   hotkeys: {
@@ -30,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
     "toggle-hand": "Control+Alt+H",
     "show-window": "Control+Alt+S",
     "leave-call": "Control+Alt+L",
+    "toggle-mini-mode": "Control+Alt+P",
   },
   alwaysOnTop: false,
   focus: {
@@ -37,6 +53,8 @@ export const DEFAULT_SETTINGS: Settings = {
     turnOnShortcut: "Turn On Meeting Focus",
     turnOffShortcut: "Turn Off Meeting Focus",
   },
+  autoMiniMode: false,
+  miniModeOpacity: 1,
 };
 
 export const HOTKEY_NAMES = Object.keys(DEFAULT_SETTINGS.hotkeys) as HotkeyName[];
@@ -82,7 +100,19 @@ export function loadSettings(file: string): Settings {
     }
   }
 
-  return { hotkeys, alwaysOnTop, focus };
+  const { autoMiniMode, miniModeOpacity } = saved;
+
+  return {
+    hotkeys,
+    alwaysOnTop,
+    focus,
+    autoMiniMode: typeof autoMiniMode === "boolean" ? autoMiniMode : DEFAULT_SETTINGS.autoMiniMode,
+    miniModeOpacity: isMiniModeOpacity(miniModeOpacity) ? miniModeOpacity : DEFAULT_SETTINGS.miniModeOpacity,
+  };
+}
+
+function isMiniModeOpacity(value: unknown): value is number {
+  return typeof value === "number" && value >= MIN_MINI_MODE_OPACITY && value <= 1;
 }
 
 /**

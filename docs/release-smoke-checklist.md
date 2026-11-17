@@ -67,6 +67,21 @@ The default leave hotkey is Control+Option+L.
 - [ ] Choose Leave Call… from the menu: the window comes forward asking "Leave the call?". Choose Leave: the icon goes back to outlined.
 - [ ] Settings… opens the settings window, and Quit Meet quits the app.
 
+## Mini Mode
+
+The default Mini Mode hotkey is Control+Option+P.
+
+- [ ] Choose Toggle Mini Mode from the menu bar: the Meeting Window becomes a small window with no title bar, and the call carries on. Choose it again: the Full window comes back where it was.
+- [ ] Focus another app and press the Mini Mode hotkey: the mini window appears without taking the keyboard from that app. Press it again: the Full window comes forward.
+- [ ] In Mini Mode, click another app's window: the mini window stays on top. Switch to another Space and to a full-screen app: the mini window is there too.
+- [ ] Drag the mini window by the strip along its top edge: it follows the pointer smoothly. Resize it from an edge or corner.
+- [ ] Switch to Full and back: each comes back at its own size and position, also after quitting and relaunching.
+- [ ] Double-click the strip along the top of the mini window: the Full window comes back.
+- [ ] Enter Mini Mode during a call and leave with Meet's leave button: the Full window comes back.
+- [ ] Turn on "Enter Mini Mode when I switch to another app during a call". In a call, Cmd+Tab to another app: the mini window appears. Outside a call, Cmd+Tab away: the Full window stays as it is.
+- [ ] Set "Mini Mode opacity" to 70%: the mini window is see-through, and the Full window is not.
+- [ ] In Mini Mode, share your screen from Meet: the Source Picker appears and sharing works.
+
 ## Focus
 
 Create the two Shortcuts described in the README's "Focus during calls" section, using a Focus whose indicator you can see in the menu bar.

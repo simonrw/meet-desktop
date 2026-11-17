@@ -12,9 +12,11 @@ interface FakeIntegrationOptions {
 function setup({
   integrations: integrationOptions = { focus: {} },
   ledger: ledgerEntries = {},
+  autoMiniMode = false,
 }: {
   integrations?: Record<string, FakeIntegrationOptions>;
   ledger?: LedgerEntries;
+  autoMiniMode?: boolean;
 } = {}) {
   const bridgeActions: string[] = [];
   const windowActions: string[] = [];
@@ -57,6 +59,7 @@ function setup({
     meetingWindow: {
       show: () => windowActions.push("show"),
       hide: () => windowActions.push("hide"),
+      setPresentation: (presentation) => windowActions.push(presentation),
       openMeeting: (code) => windowActions.push(`open ${code}`),
       confirmLeave: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
       confirmSwitch: () => new Promise((resolve) => pendingConfirmations.push(resolve)),
@@ -69,6 +72,7 @@ function setup({
       },
     },
     clock,
+    autoMiniMode: () => autoMiniMode,
   });
   controller.onStateChange((state) => announcedStates.push(state));
 
@@ -726,5 +730,113 @@ describe("join meeting Command", () => {
     await answerConfirmation(true);
 
     expect(windowActions).toEqual(["open abc-defg-hij"]);
+  });
+});
+
+describe("toggle Mini Mode Command", () => {
+  test("switches the Meeting Window from Full to Mini Mode and back, bringing Full forward", () => {
+    const { controller, windowActions } = setup();
+
+    controller.command({ type: "toggle-mini-mode" });
+    expect(windowActions).toEqual(["mini"]);
+
+    controller.command({ type: "toggle-mini-mode" });
+    expect(windowActions).toEqual(["mini", "full", "show"]);
+  });
+
+  test("works in every Meeting State", () => {
+    const { controller, windowActions } = setup();
+
+    controller.command({ type: "toggle-mini-mode" });
+    controller.signal({ type: "entered-lobby" });
+    controller.command({ type: "toggle-mini-mode" });
+    controller.signal({ type: "entered-call" });
+    controller.command({ type: "toggle-mini-mode" });
+
+    expect(windowActions).toEqual(["mini", "full", "show", "mini"]);
+  });
+});
+
+describe("Mini Mode when the call ends", () => {
+  test("returns the Meeting Window to Full", () => {
+    const { controller, windowActions } = setup();
+    controller.signal({ type: "entered-call" });
+    controller.command({ type: "toggle-mini-mode" });
+
+    controller.signal({ type: "left-call" });
+
+    expect(windowActions).toEqual(["mini", "full"]);
+  });
+
+  test("leaves a Full Meeting Window alone", () => {
+    const { controller, windowActions } = setup();
+    controller.signal({ type: "entered-call" });
+
+    controller.signal({ type: "left-call" });
+
+    expect(windowActions).toEqual([]);
+  });
+
+  test("stays on when the user backs out of the lobby", () => {
+    const { controller, windowActions } = setup();
+    controller.signal({ type: "entered-lobby" });
+    controller.command({ type: "toggle-mini-mode" });
+
+    controller.signal({ type: "left-call" });
+
+    expect(windowActions).toEqual(["mini"]);
+  });
+});
+
+describe("auto Mini Mode", () => {
+  test("enters Mini Mode when the user switches to another app during a call", () => {
+    const { controller, windowActions } = setup({ autoMiniMode: true });
+    controller.signal({ type: "entered-call" });
+
+    controller.switchedAway();
+
+    expect(windowActions).toEqual(["mini"]);
+  });
+
+  test("does nothing when the user switches to another app outside a call", () => {
+    const { controller, windowActions } = setup({ autoMiniMode: true });
+
+    controller.switchedAway();
+    controller.signal({ type: "entered-lobby" });
+    controller.switchedAway();
+    controller.signal({ type: "entered-call" });
+    controller.signal({ type: "left-call" });
+    controller.switchedAway();
+
+    expect(windowActions).toEqual([]);
+  });
+
+  test("does nothing when the option is off", () => {
+    const { controller, windowActions } = setup({ autoMiniMode: false });
+    controller.signal({ type: "entered-call" });
+
+    controller.switchedAway();
+
+    expect(windowActions).toEqual([]);
+  });
+
+  test("leaves a Meeting Window already in Mini Mode alone", () => {
+    const { controller, windowActions } = setup({ autoMiniMode: true });
+    controller.signal({ type: "entered-call" });
+    controller.command({ type: "toggle-mini-mode" });
+
+    controller.switchedAway();
+
+    expect(windowActions).toEqual(["mini"]);
+  });
+
+  test("returns to Full when the call ends", () => {
+    const { controller, windowActions } = setup({ autoMiniMode: true });
+    controller.signal({ type: "entered-call" });
+    controller.switchedAway();
+
+    controller.signal({ type: "left-call" });
+
+    expect(windowActions).toEqual(["mini", "full"]);
   });
 });

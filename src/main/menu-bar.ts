@@ -91,6 +91,7 @@ function buildMenu(
     },
     { type: "separator" },
     { id: "show-window", label: "Show Window", click: send("show-window") },
+    { id: "toggle-mini-mode", label: "Toggle Mini Mode", click: send("toggle-mini-mode") },
     { id: "leave-call", label: "Leave Call…", enabled: inCall, click: send("leave-call") },
     { id: "join-meeting", label: "Join Meeting…", click: () => windows.openJoinPrompt() },
     { type: "separator" },

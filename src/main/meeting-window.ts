@@ -2,26 +2,60 @@ import { join } from "node:path";
 
 import {
   app,
-  BrowserWindow,
+  BaseWindow,
   dialog,
   screen,
   session,
   shell,
   systemPreferences,
+  View,
+  WebContentsView,
   type Session,
   type WebContents,
 } from "electron";
 
 import { MEET_BRIDGE_PRELOAD } from "./meet-bridge";
-import type { MeetingWindowPort } from "./meeting-controller";
+import type { Command, MeetingWindowPort, Presentation } from "./meeting-controller";
 import { isInAppUrl, isMeetUrl } from "./navigation-policy";
 import { shareScreenOnRequest } from "./screen-share";
-import { loadBounds, saveBounds } from "./window-bounds";
+import { loadBounds, saveBounds, type Rectangle } from "./window-bounds";
+
+export type HandleChannel = "mini-mode-handle";
+
+/**
+ * What the mini window's handle reports: the pointer's screen position as the user drags, or a double-click.
+ */
+export type HandleMessage = { type: "drag-start" | "drag"; x: number; y: number } | { type: "double-click" };
 
 // Persistent so the Google login survives relaunches, and dedicated so it never mixes with a browser profile.
 const PARTITION = "persist:meet";
 
 const DEFAULT_SIZE = { width: 1280, height: 800 };
+
+const MINI_DEFAULT_SIZE = { width: 400, height: 225 };
+const MINI_MIN_SIZE = { width: 240, height: 135 };
+const MINI_DEFAULT_MARGIN = 24;
+
+const HANDLE_HEIGHT = 20;
+const HANDLE_CHANNEL: HandleChannel = "mini-mode-handle";
+const HANDLE_PRELOAD = join(__dirname, "..", "preload", "mini-mode-handle.js");
+
+const HANDLE_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Mini Mode handle</title>
+    <style>
+      html, body { margin: 0; height: 100%; }
+      body { background: linear-gradient(rgb(0 0 0 / 45%), transparent); cursor: grab; }
+      body::after {
+        content: ""; position: absolute; top: 6px; left: calc(50% - 18px);
+        width: 36px; height: 4px; border-radius: 2px; background: rgb(255 255 255 / 70%);
+      }
+    </style>
+  </head>
+  <body></body>
+</html>`)}`;
 
 const MEET_PERMISSIONS = new Set([
   "media",
@@ -36,60 +70,143 @@ export interface MeetingWindow extends MeetingWindowPort {
   readonly webContents: WebContents;
 
   /**
-   * Sets whether the window floats above other apps' windows, on the current Space only.
+   * Sets whether the Full window floats above other apps' windows, on the current Space only. The mini window always
+   * floats.
    */
   keepOnTop(onTop: boolean): void;
+
+  /**
+   * Sets the mini window's opacity, from 0 to 1. The Full window stays opaque.
+   */
+  setMiniOpacity(opacity: number): void;
+}
+
+interface MiniWindow {
+  window: BaseWindow;
+  handle: WebContentsView;
+  saveBounds(): void;
 }
 
 /**
- * Creates the Meeting Window, hidden until `show` is called: Meet hosted in a dedicated persistent session, which
- * remembers its bounds. Closing the window calls `onCloseRequested` in place of closing it, until the app quits.
+ * Creates the Meeting Window, hidden until `show` is called: Meet hosted in a dedicated persistent session, shown either Full or in Mini Mode, a
+ * frameless window floating above every other app. Each presentation remembers its own bounds. Closing the window
+ * sends the close window Command to `onCommand` in place of closing it, until the app quits, and double-clicking the
+ * mini window sends the toggle Mini Mode Command.
  */
-export function createMeetingWindow(meetOrigin: string, onCloseRequested: () => void): MeetingWindow {
+export function createMeetingWindow(meetOrigin: string, onCommand: (command: Command) => void): MeetingWindow {
   const meetSession = session.fromPartition(PARTITION);
-  configureSession(meetSession, meetOrigin);
+  const userData = app.getPath("userData");
 
-  const boundsFile = join(app.getPath("userData"), "window-bounds.json");
-  const workAreas = screen.getAllDisplays().map((display) => display.workArea);
+  let presentation: Presentation = "full";
+  let miniOpacity = 1;
+  let mini: MiniWindow | undefined;
 
-  const window = new BrowserWindow({
-    ...(loadBounds(boundsFile, workAreas) ?? DEFAULT_SIZE),
-    title: "Meet",
-    show: false,
+  const meetView = new WebContentsView({
     webPreferences: { session: meetSession, sandbox: true, contextIsolation: true, preload: MEET_BRIDGE_PRELOAD },
   });
 
-  routeNavigation(window, meetOrigin);
-  rememberBounds(window, boundsFile);
-  interceptClose(window, onCloseRequested);
+  const full = new BaseWindow({
+    ...(loadBounds(join(userData, "window-bounds.json"), workAreas()) ?? DEFAULT_SIZE),
+    title: "Meet",
+    show: false,
+  });
+  full.setContentView(meetView);
 
-  window.loadURL(meetOrigin);
+  const shown = () => (presentation === "mini" && mini ? mini.window : full);
+
+  configureSession(meetSession, meetOrigin, shown);
+  routeNavigation(meetView.webContents, meetOrigin);
+  meetView.webContents.on("page-title-updated", (_event, title) => full.setTitle(title));
+
+  const saveFullBounds = rememberBounds(full, join(userData, "window-bounds.json"));
+  const onClose = () => onCommand({ type: "close-window" });
+  interceptClose(full, onClose);
+
+  meetView.webContents.loadURL(meetOrigin);
+
+  const enterMini = () => {
+    if (!mini) {
+      mini = createMiniWindow(join(userData, "mini-window-bounds.json"), miniOpacity, () =>
+        onCommand({ type: "toggle-mini-mode" }),
+      );
+      interceptClose(mini.window, onClose);
+    }
+
+    saveFullBounds();
+
+    full.setContentView(new View());
+    mini.window.setContentView(meetView);
+    meetView.addChildView(mini.handle);
+
+    // The user may be working in another app, which must keep the keyboard.
+    mini.window.showInactive();
+    full.hide();
+  };
+
+  const enterFull = () => {
+    if (!mini) {
+      return;
+    }
+
+    mini.saveBounds();
+
+    meetView.removeChildView(mini.handle);
+    mini.window.setContentView(new View());
+    full.setContentView(meetView);
+
+    full.showInactive();
+    mini.window.hide();
+  };
 
   const show = () => {
+    const window = shown();
     if (window.isMinimized()) {
       window.restore();
     }
 
     window.show();
+    meetView.webContents.focus();
   };
 
   return {
-    webContents: window.webContents,
+    webContents: meetView.webContents,
     show,
-    hide: () => hide(window),
-    keepOnTop: (onTop) => window.setAlwaysOnTop(onTop, "floating"),
+    hide: () => hide(shown()),
+    keepOnTop: (onTop) => full.setAlwaysOnTop(onTop, "floating"),
+
+    setPresentation(next) {
+      if (next === presentation) {
+        return;
+      }
+
+      presentation = next;
+      if (next === "full") {
+        enterFull();
+      } else if (full.isFullScreen()) {
+        // Hiding a full-screen window leaves an empty black Space behind.
+        full.once("leave-full-screen", () => presentation === "mini" && enterMini());
+        full.setFullScreen(false);
+      } else {
+        enterMini();
+      }
+    },
+
+    setMiniOpacity(opacity) {
+      miniOpacity = opacity;
+      mini?.window.setOpacity(opacity);
+    },
 
     openMeeting(code) {
-      window.loadURL(new URL(code, meetOrigin).href);
+      meetView.webContents.loadURL(new URL(code, meetOrigin).href);
       show();
     },
 
-    confirmLeave: () => confirmLeave(window, show, "Leave the call?", "Leave"),
-    confirmSwitch: (code) => confirmLeave(window, show, `Leave the call and join ${code}?`, "Leave and Join"),
+    confirmLeave: () => confirmLeave(shown(), show, "Leave the call?", "Leave"),
+    confirmSwitch: (code) => confirmLeave(shown(), show, `Leave the call and join ${code}?`, "Leave and Join"),
   };
 }
 
-async function confirmLeave(window: BrowserWindow, show: () => void, message: string, leave: string): Promise<boolean> {
+async function confirmLeave(window: BaseWindow, show: () => void, message: string, leave: string): Promise<boolean> {
   // The question is a sheet on the window, which may be hidden or behind another app.
   show();
 
@@ -106,7 +223,66 @@ async function confirmLeave(window: BrowserWindow, show: () => void, message: st
   return response === 0;
 }
 
-function configureSession(meetSession: Session, meetOrigin: string): void {
+/**
+ * Creates the hidden mini window, with a handle along its top edge that the user drags it by and double-clicks to
+ * call `onDoubleClick`.
+ */
+function createMiniWindow(boundsFile: string, opacity: number, onDoubleClick: () => void): MiniWindow {
+  const window = new BaseWindow({
+    ...(loadBounds(boundsFile, workAreas()) ?? defaultMiniBounds()),
+    minWidth: MINI_MIN_SIZE.width,
+    minHeight: MINI_MIN_SIZE.height,
+    frame: false,
+    show: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+  });
+
+  window.setOpacity(opacity);
+  window.setAlwaysOnTop(true, "floating");
+  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  const handle = new WebContentsView({
+    webPreferences: { sandbox: true, contextIsolation: true, preload: HANDLE_PRELOAD },
+  });
+  handle.setBackgroundColor("#00000000");
+  handle.webContents.loadURL(HANDLE_PAGE);
+
+  const layoutHandle = () => handle.setBounds({ x: 0, y: 0, width: window.getContentBounds().width, height: HANDLE_HEIGHT });
+  layoutHandle();
+  window.on("resize", layoutHandle);
+
+  let dragStart: { pointer: { x: number; y: number }; window: number[] } | undefined;
+  handle.webContents.ipc.on(HANDLE_CHANNEL, (_event, message: HandleMessage) => {
+    if (message.type === "drag-start") {
+      dragStart = { pointer: { x: message.x, y: message.y }, window: window.getPosition() };
+    } else if (message.type === "drag" && dragStart) {
+      const [x, y] = dragStart.window as [number, number];
+      window.setPosition(x + message.x - dragStart.pointer.x, y + message.y - dragStart.pointer.y);
+    } else if (message.type === "double-click") {
+      onDoubleClick();
+    }
+  });
+
+  return { window, handle, saveBounds: rememberBounds(window, boundsFile) };
+}
+
+function defaultMiniBounds(): Rectangle {
+  const area = screen.getPrimaryDisplay().workArea;
+
+  return {
+    x: area.x + area.width - MINI_DEFAULT_SIZE.width - MINI_DEFAULT_MARGIN,
+    y: area.y + area.height - MINI_DEFAULT_SIZE.height - MINI_DEFAULT_MARGIN,
+    ...MINI_DEFAULT_SIZE,
+  };
+}
+
+function workAreas(): Rectangle[] {
+  return screen.getAllDisplays().map((display) => display.workArea);
+}
+
+function configureSession(meetSession: Session, meetOrigin: string, meetingWindow: () => BaseWindow): void {
   const isAllowed = (permission: string, url: string) => isMeetUrl(url, meetOrigin) && MEET_PERMISSIONS.has(permission);
 
   meetSession.setPermissionCheckHandler((_contents, permission, requestingOrigin) => {
@@ -115,14 +291,14 @@ function configureSession(meetSession: Session, meetOrigin: string): void {
 
   const chooseScreenShare = shareScreenOnRequest(meetSession);
 
-  meetSession.setPermissionRequestHandler(async (contents, permission, callback, details) => {
+  meetSession.setPermissionRequestHandler(async (_contents, permission, callback, details) => {
     if (!isAllowed(permission, details.requestingUrl)) {
       callback(false);
       return;
     }
 
     if (permission === "display-capture") {
-      callback(await chooseScreenShare(contents));
+      callback(await chooseScreenShare(meetingWindow()));
       return;
     }
 
@@ -146,9 +322,7 @@ async function askMacOSForMedia(mediaTypes: Array<"video" | "audio">): Promise<b
   return true;
 }
 
-function routeNavigation(window: BrowserWindow, meetOrigin: string): void {
-  const contents = window.webContents;
-
+function routeNavigation(contents: WebContents, meetOrigin: string): void {
   contents.setWindowOpenHandler(({ url }) => {
     if (isInAppUrl(url, meetOrigin)) {
       contents.loadURL(url);
@@ -181,20 +355,25 @@ function openInBrowser(url: string): void {
   }
 }
 
-function rememberBounds(window: BrowserWindow, boundsFile: string): void {
+/**
+ * Saves the window's bounds whenever the user moves or resizes it, returning a function that saves them on demand.
+ */
+function rememberBounds(window: BaseWindow, boundsFile: string): () => void {
   const save = () => saveBounds(boundsFile, window.getNormalBounds());
 
   window.on("resized", save);
   window.on("moved", save);
   window.on("close", save);
+
+  return save;
 }
 
-function interceptClose(window: BrowserWindow, onCloseRequested: () => void): void {
-  let quitting = false;
-  app.on("before-quit", () => {
-    quitting = true;
-  });
+let quitting = false;
+app.on("before-quit", () => {
+  quitting = true;
+});
 
+function interceptClose(window: BaseWindow, onCloseRequested: () => void): void {
   window.on("close", (event) => {
     if (quitting) {
       return;
@@ -205,7 +384,7 @@ function interceptClose(window: BrowserWindow, onCloseRequested: () => void): vo
   });
 }
 
-function hide(window: BrowserWindow): void {
+function hide(window: BaseWindow): void {
   // Hiding a full-screen window leaves an empty black Space behind.
   if (window.isFullScreen()) {
     window.once("leave-full-screen", () => window.hide());

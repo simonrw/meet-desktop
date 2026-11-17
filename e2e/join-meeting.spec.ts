@@ -62,14 +62,16 @@ async function join(prompt: Page, input: string) {
 }
 
 function meetingWindowVisible() {
-  return app.evaluate(({ webContents, BrowserWindow }) => {
+  return app.evaluate(({ webContents, BaseWindow }) => {
     const meeting = webContents.getAllWebContents().find((contents) => contents.getTitle() === "Stub Meet");
-    return meeting && BrowserWindow.fromWebContents(meeting)?.isVisible();
+    return BaseWindow.getAllWindows().some(
+      (window) => window.isVisible() && (window.contentView as Electron.WebContentsView).webContents === meeting,
+    );
   });
 }
 
 function windowCount() {
-  return app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+  return app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length);
 }
 
 /**
@@ -129,7 +131,7 @@ test("a Meet link opens that meeting's pre-join screen", async () => {
 });
 
 test("joining brings back a hidden Meeting Window", async () => {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.hide());
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.hide());
   const prompt = await fromMenuBar();
 
   await join(prompt, "abc-defg-hij");
@@ -199,7 +201,7 @@ test("joining during a call switches meetings once the user confirms", async () 
 });
 
 test("opening a meet-desktop URL opens the meeting in a hidden Meeting Window", async () => {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.hide());
+  await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]?.hide());
 
   await app.evaluate(({ app }) => app.emit("open-url", { preventDefault() {} }, "meet-desktop://abc-defg-hij"));
 

@@ -5,10 +5,10 @@ import { app, BrowserWindow } from "electron";
 import { acceleratorFromKey, acceleratorLabel, type RecordedKey } from "./accelerator";
 import { pauseHotkeys, registerHotkeys } from "./hotkeys";
 import type { Command } from "./meeting-controller";
-import type { MeetingWindow } from "./meeting-window";
 import {
   HOTKEY_NAMES,
   loadSettings,
+  MIN_MINI_MODE_OPACITY,
   saveSettings,
   type FocusSettings,
   type HotkeyName,
@@ -37,6 +37,11 @@ export interface SettingsView {
     /** How the last test of the Focus Shortcuts went, until the settings change. */
     testResult?: FocusTestResult;
   };
+  autoMiniMode: boolean;
+  miniModeOpacity: number;
+
+  /** The opacities the user can choose for the mini window. */
+  miniModeOpacities: number[];
 }
 
 export interface FocusTestResult {
@@ -55,10 +60,18 @@ export type SettingsChange =
   | { type: "launch-at-login"; enabled: boolean }
   | { type: "always-on-top"; enabled: boolean }
   | { type: "focus"; focus: Partial<FocusSettings> }
-  | { type: "test-focus" };
+  | { type: "test-focus" }
+  | { type: "auto-mini-mode"; enabled: boolean }
+  | { type: "mini-mode-opacity"; opacity: number };
 
 export interface SettingsWindow {
-  readonly focus: FocusSettings;
+  /** The settings as they are now. */
+  readonly settings: Settings;
+
+  /**
+   * Calls `listener` with the new settings each time the user changes them.
+   */
+  onChange(listener: (settings: Settings) => void): void;
 
   /**
    * Opens the settings window, or brings it to the front when it's already open.
@@ -77,7 +90,10 @@ const HOTKEY_LABELS: Record<HotkeyName, string> = {
   "toggle-hand": "Raise hand",
   "show-window": "Show window",
   "leave-call": "Leave call",
+  "toggle-mini-mode": "Mini Mode",
 };
+
+const MINI_MODE_OPACITIES = [1, 0.9, 0.8, 0.7, 0.6, 0.5].filter((opacity) => opacity >= MIN_MINI_MODE_OPACITY);
 
 const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
 <html>
@@ -99,6 +115,7 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
       .help ol { margin: 4px 0; padding-left: 20px; }
       .test-result { margin: 8px 0 0; }
       .test-result.ok { color: #248a3d; }
+      label { display: block; padding: 4px 0; }
     </style>
   </head>
   <body></body>
@@ -106,11 +123,10 @@ const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doct
 
 /**
  * Loads the user's settings and applies them, registering the hotkeys that are turned on, which send their Commands
- * to `onCommand`, and keeping `meetingWindow` on top when the user asked for it. Returns the settings window, where
- * each change takes effect straight away, and whose Focus test button calls `testFocus`.
+ * to `onCommand`. Returns the settings window, where each change takes effect straight away, and whose Focus test
+ * button calls `testFocus`.
  */
 export function startSettings(
-  meetingWindow: Pick<MeetingWindow, "keepOnTop">,
   onCommand: (command: Command) => void,
   testFocus: () => Promise<FocusTestResult>,
 ): SettingsWindow {
@@ -122,6 +138,7 @@ export function startSettings(
   let recording: HotkeyName | undefined;
   let focusTestResult: FocusTestResult | undefined;
   let window: BrowserWindow | undefined;
+  const listeners: Array<(settings: Settings) => void> = [];
 
   const applyHotkeys = () => {
     // Recording keeps the hotkeys paused, so other changes made meanwhile must not turn them back on.
@@ -130,19 +147,19 @@ export function startSettings(
     }
   };
 
-  const apply = () => {
-    applyHotkeys();
-    meetingWindow.keepOnTop(settings.alwaysOnTop);
-  };
-
   const bind = (name: HotkeyName, accelerator: string | null): Settings => {
     return { ...settings, hotkeys: { ...settings.hotkeys, [name]: accelerator } };
   };
 
-  const save = (changed: Settings) => {
+  const store = (changed: Settings) => {
     settings = changed;
     saveSettings(file, settings);
-    apply();
+    listeners.forEach((listener) => listener(settings));
+  };
+
+  const save = (changed: Settings) => {
+    store(changed);
+    applyHotkeys();
   };
 
   const stopRecording = () => {
@@ -227,6 +244,16 @@ export function startSettings(
       case "test-focus":
         focusTestResult = await testFocus();
         break;
+
+      case "auto-mini-mode":
+        store({ ...settings, autoMiniMode: change.enabled });
+        break;
+
+      case "mini-mode-opacity":
+        if (MINI_MODE_OPACITIES.includes(change.opacity)) {
+          store({ ...settings, miniModeOpacity: change.opacity });
+        }
+        break;
     }
   };
 
@@ -261,13 +288,20 @@ export function startSettings(
     launchAtLogin: app.getLoginItemSettings().openAtLogin,
     alwaysOnTop: settings.alwaysOnTop,
     focus: { ...settings.focus, testResult: focusTestResult },
+    autoMiniMode: settings.autoMiniMode,
+    miniModeOpacity: settings.miniModeOpacity,
+    miniModeOpacities: MINI_MODE_OPACITIES,
   });
 
-  apply();
+  applyHotkeys();
 
   return {
-    get focus() {
-      return settings.focus;
+    get settings() {
+      return settings;
+    },
+
+    onChange(listener) {
+      listeners.push(listener);
     },
 
     open() {
@@ -278,7 +312,7 @@ export function startSettings(
 
       window = new BrowserWindow({
         width: 460,
-        height: 640,
+        height: 720,
         useContentSize: true,
         title: "Settings",
         resizable: false,

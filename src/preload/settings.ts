@@ -135,6 +135,33 @@ function shortcutField(
   return label;
 }
 
+function autoMiniModeOption(enabled: boolean): HTMLElement {
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.id = "auto-mini-mode";
+  checkbox.checked = enabled;
+  checkbox.addEventListener("change", () => change({ type: "auto-mini-mode", enabled: checkbox.checked }));
+
+  const label = document.createElement("label");
+  label.append(checkbox, " Enter Mini Mode when I switch to another app during a call");
+
+  return label;
+}
+
+function miniModeOpacityOption(opacity: number, opacities: number[]): HTMLElement {
+  const select = document.createElement("select");
+  select.id = "mini-mode-opacity";
+  for (const choice of opacities) {
+    select.append(new Option(`${Math.round(choice * 100)}%`, String(choice), false, choice === opacity));
+  }
+  select.addEventListener("change", () => change({ type: "mini-mode-opacity", opacity: Number(select.value) }));
+
+  const label = document.createElement("label");
+  label.append("Mini Mode opacity ", select);
+
+  return label;
+}
+
 function heading(text: string): HTMLElement {
   const element = document.createElement("h2");
   element.textContent = text;
@@ -151,6 +178,9 @@ function render(view: SettingsView): void {
   document.body.replaceChildren(
     heading("Hotkeys"),
     ...view.hotkeys.map(hotkeyRow),
+    heading("Mini Mode"),
+    autoMiniModeOption(view.autoMiniMode),
+    miniModeOpacityOption(view.miniModeOpacity, view.miniModeOpacities),
     heading("Focus"),
     ...focusSection(view.focus),
     heading("General"),

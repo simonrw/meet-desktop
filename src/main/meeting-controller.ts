@@ -24,10 +24,19 @@ export type MeetSignal =
  * A Command that carries nothing beyond its type.
  */
 export type PlainCommand = {
-  type: "toggle-mute" | "toggle-camera" | "toggle-hand" | "leave-call" | "show-window" | "close-window";
+  type:
+    | "toggle-mute"
+    | "toggle-camera"
+    | "toggle-hand"
+    | "leave-call"
+    | "show-window"
+    | "close-window"
+    | "toggle-mini-mode";
 };
 
 export type Command = PlainCommand | { type: "join-meeting"; code: string };
+
+export type Presentation = "full" | "mini";
 
 export interface MeetBridgePort {
   toggleMute(): void;
@@ -39,6 +48,7 @@ export interface MeetBridgePort {
 export interface MeetingWindowPort {
   show(): void;
   hide(): void;
+  setPresentation(presentation: Presentation): void;
 
   /**
    * Opens the pre-join screen of the meeting with the given code and brings the window to the front.
@@ -78,6 +88,11 @@ export interface MeetingController {
   command(command: Command): void;
 
   /**
+   * Tells the controller the user switched from the app to another one.
+   */
+  switchedAway(): void;
+
+  /**
    * Restores every applied Integration, resolving once they have all finished, so the app can quit.
    */
   quit(): Promise<void>;
@@ -86,6 +101,7 @@ export interface MeetingController {
 /**
  * Creates the Meeting Controller, which owns the Meeting State: it takes in Meet Signals and Commands, acts on the Meet
  * page and the Meeting Window through their ports, and applies Integrations while the user is in a call.
+ * `autoMiniMode` reads whether the user wants Mini Mode whenever they switch away from the app during a call.
  */
 export function createMeetingController({
   meetBridge,
@@ -93,18 +109,21 @@ export function createMeetingController({
   integrations,
   ledger,
   clock,
+  autoMiniMode,
 }: {
   meetBridge: MeetBridgePort;
   meetingWindow: MeetingWindowPort;
   integrations: Integration[];
   ledger: IntegrationLedgerPort;
   clock: Clock;
+  autoMiniMode: () => boolean;
 }): MeetingController {
   let status: MeetingState["status"] = "idle";
   let muted = false;
   let cameraOn = true;
   let handRaised = false;
   let confirming = false;
+  let presentation: Presentation = "full";
   const listeners: Array<(state: MeetingState) => void> = [];
 
   const integrationLifecycle = startIntegrationLifecycle({ integrations, ledger, clock });
@@ -146,6 +165,11 @@ export function createMeetingController({
     }
   }
 
+  function present(next: Presentation): void {
+    presentation = next;
+    meetingWindow.setPresentation(next);
+  }
+
   async function closeWindow(): Promise<void> {
     if (status !== "in-call" || (await leaveOnceConfirmed())) {
       meetingWindow.hide();
@@ -183,6 +207,10 @@ export function createMeetingController({
           break;
 
         case "left-call":
+          if (status === "in-call" && presentation === "mini") {
+            present("full");
+          }
+
           integrationLifecycle.leftCall();
           status = "idle";
           muted = false;
@@ -222,6 +250,15 @@ export function createMeetingController({
         case "join-meeting":
           void joinMeeting(command.code);
           return;
+
+        case "toggle-mini-mode":
+          if (presentation === "full") {
+            present("mini");
+          } else {
+            present("full");
+            meetingWindow.show();
+          }
+          return;
       }
 
       if (status !== "in-call") {
@@ -244,6 +281,12 @@ export function createMeetingController({
         case "leave-call":
           void leaveOnceConfirmed();
           break;
+      }
+    },
+
+    switchedAway() {
+      if (status === "in-call" && presentation === "full" && autoMiniMode()) {
+        present("mini");
       }
     },
 
