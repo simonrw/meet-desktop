@@ -110,6 +110,8 @@ Meet checks for a new version when it opens and every hour after, and downloads 
 
 Once a new version has downloaded, the menu bar menu shows Restart to Update with the version number. Choose it to install the new version now: Meet quits, turns off the Focus if it's still on from a call, and opens again on the new version. Restart to Update is greyed out during a call, and Meet never restarts by itself, so an update never interrupts a call.
 
+To check straight away, choose Check for Updates… in the Meet menu. It tells you if you're on the latest version, starts downloading a new one, or offers to restart to install one that has already downloaded.
+
 Copies run with `npm start` never check for updates.
 
 ## Troubleshooting

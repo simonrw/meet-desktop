@@ -97,8 +97,8 @@ if (!app.requestSingleInstanceLock()) {
 
     restoreIntegrationsBeforeQuitting(meetingController);
 
-    setAppMenu(openers);
     const updates = startUpdates(meetingController, unpackagedOverride("MEET_DESKTOP_UPDATES"));
+    setAppMenu(openers, updates);
     const menuBar = startMenuBar(meetingController, updates, openers);
 
     openUrl = (url) => {
