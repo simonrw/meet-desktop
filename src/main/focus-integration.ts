@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 
-import type { Integration } from "./integration-lifecycle";
+import type { Integration } from "./meeting-controller";
 import type { FocusSettings } from "./settings-store";
 
 // A Shortcut waiting on a prompt the user never sees would otherwise hold up quitting forever.
@@ -8,12 +8,19 @@ const SHORTCUT_TIMEOUT_MS = 30_000;
 
 export type RunShortcut = (name: string) => Promise<void>;
 
+/**
+ * How a test of the Focus Shortcuts went: whether both worked, and a message saying so.
+ */
+export interface FocusTestResult {
+  ok: boolean;
+  message: string;
+}
+
 export interface FocusIntegration extends Integration {
   /**
-   * Runs the turn on Shortcut and then the turn off Shortcut, resolving to whether both worked and a message saying
-   * how it went.
+   * Runs the turn on Shortcut and then the turn off Shortcut.
    */
-  test(): Promise<{ ok: boolean; message: string }>;
+  test(): Promise<FocusTestResult>;
 }
 
 /**
@@ -44,10 +51,10 @@ export function shortcutRunner(command: string): RunShortcut {
 }
 
 /**
- * The Focus Integration: macOS has no API for setting a Focus, so it runs the user's Shortcuts to turn one on for a
- * call and off afterwards.
+ * The Focus Integration: runs the user's Shortcuts to turn a Focus on for a call and off afterwards.
  */
 export function focusIntegration(settings: () => FocusSettings, runShortcut: RunShortcut): FocusIntegration {
+  // macOS has no API for setting a Focus, but a Shortcut can set one.
   return {
     id: "focus",
     label: "Focus",

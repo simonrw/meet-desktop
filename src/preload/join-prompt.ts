@@ -1,4 +1,4 @@
-// The join prompt's page: sends what the user enters to the main process and shows any error inline. It runs as a
+// The Join Prompt's page: sends what the user enters to the main process and shows any error inline. It runs as a
 // sandboxed preload script, which cannot load other local modules.
 
 import { ipcRenderer } from "electron";

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readJsonFile, writeJsonFile } from "./json-file";
 
 export interface Rectangle {
   x: number;
@@ -15,21 +15,14 @@ const MIN_VISIBLE_HEIGHT = 50;
  * Reads window bounds saved by `saveBounds`, returning them only if they fit one of the given display work areas.
  */
 export function loadBounds(file: string, workAreas: Rectangle[]): Rectangle | undefined {
-  let saved: unknown;
-  try {
-    saved = JSON.parse(readFileSync(file, "utf8"));
-  } catch {
-    return undefined;
-  }
-
-  return restorableBounds(saved, workAreas);
+  return restorableBounds(readJsonFile(file), workAreas);
 }
 
 /**
  * Persists window bounds so the next launch can restore them.
  */
 export function saveBounds(file: string, bounds: Rectangle): void {
-  writeFileSync(file, JSON.stringify(bounds));
+  writeJsonFile(file, bounds);
 }
 
 /**

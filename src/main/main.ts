@@ -72,7 +72,7 @@ if (!app.requestSingleInstanceLock()) {
     meetingWindow.show();
 
     const joinPrompt = startJoinPrompt(sendCommand);
-    const windows = { openSettings: () => settingsWindow.open(), openJoinPrompt: () => joinPrompt.open() };
+    const openers = { openSettings: () => settingsWindow.open(), openJoinPrompt: () => joinPrompt.open() };
 
     const focus = focusIntegration(
       () => settingsWindow.settings.focus,
@@ -93,10 +93,11 @@ if (!app.requestSingleInstanceLock()) {
       },
       autoMiniMode: () => settingsWindow.settings.autoMiniMode,
     });
+
     restoreIntegrationsBeforeQuitting(meetingController);
 
-    setAppMenu(windows);
-    const menuBar = startMenuBar(meetingController, windows);
+    setAppMenu(openers);
+    const menuBar = startMenuBar(meetingController, openers);
 
     openUrl = (url) => {
       const link = parseMeetingLink(url);

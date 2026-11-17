@@ -1,10 +1,18 @@
 import { app, Menu } from "electron";
 
 /**
+ * Opens the app's own windows from a menu.
+ */
+export interface WindowOpeners {
+  openJoinPrompt(): void;
+  openSettings(): void;
+}
+
+/**
  * Sets the macOS menu bar menus, with a Settings item (Cmd+,) in the app menu and a Join Meeting item (Cmd+J) in the
  * File menu.
  */
-export function setAppMenu({ openSettings, openJoinPrompt }: { openSettings(): void; openJoinPrompt(): void }): void {
+export function setAppMenu({ openSettings, openJoinPrompt }: WindowOpeners): void {
   const menu = Menu.buildFromTemplate([
     {
       label: app.name,

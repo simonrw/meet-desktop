@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import type { Integration, LedgerEntries } from "./integration-lifecycle";
-import { createMeetingController, type PlainCommand, type Presentation } from "./meeting-controller";
+import {
+  createMeetingController,
+  type Integration,
+  type LedgerEntries,
+  type PlainCommand,
+  type Presentation,
+} from "./meeting-controller";
 
 interface FakeIntegrationOptions {
   enabled?: boolean;

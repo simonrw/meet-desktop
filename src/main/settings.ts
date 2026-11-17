@@ -4,11 +4,13 @@ import { app, BrowserWindow } from "electron";
 
 import { acceleratorFromKey, acceleratorLabel, type RecordedKey } from "./accelerator";
 import { pauseHotkeys, registerHotkeys } from "./hotkeys";
+import type { FocusTestResult } from "./focus-integration";
 import type { Command } from "./meeting-controller";
 import {
   HOTKEY_NAMES,
+  isMiniModeOpacity,
   loadSettings,
-  MIN_MINI_MODE_OPACITY,
+  MINI_MODE_OPACITIES,
   saveSettings,
   type FocusSettings,
   type HotkeyName,
@@ -42,11 +44,6 @@ export interface SettingsView {
 
   /** The opacities the user can choose for the mini window. */
   miniModeOpacities: number[];
-}
-
-export interface FocusTestResult {
-  ok: boolean;
-  message: string;
 }
 
 /**
@@ -92,8 +89,6 @@ const HOTKEY_LABELS: Record<HotkeyName, string> = {
   "leave-call": "Leave call",
   "toggle-mini-mode": "Mini Mode",
 };
-
-const MINI_MODE_OPACITIES = [1, 0.9, 0.8, 0.7, 0.6, 0.5].filter((opacity) => opacity >= MIN_MINI_MODE_OPACITY);
 
 const SETTINGS_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
 <html>
@@ -151,14 +146,14 @@ export function startSettings(
     return { ...settings, hotkeys: { ...settings.hotkeys, [name]: accelerator } };
   };
 
-  const store = (changed: Settings) => {
+  const save = (changed: Settings) => {
     settings = changed;
     saveSettings(file, settings);
     listeners.forEach((listener) => listener(settings));
   };
 
-  const save = (changed: Settings) => {
-    store(changed);
+  const saveHotkeys = (changed: Settings) => {
+    save(changed);
     applyHotkeys();
   };
 
@@ -200,7 +195,7 @@ export function startSettings(
       return;
     }
 
-    save(changed);
+    saveHotkeys(changed);
   };
 
   const change = async (change: SettingsChange) => {
@@ -225,7 +220,7 @@ export function startSettings(
 
       case "turn-off":
         refusal = undefined;
-        save(bind(change.name, null));
+        saveHotkeys(bind(change.name, null));
         break;
 
       case "launch-at-login":
@@ -246,12 +241,12 @@ export function startSettings(
         break;
 
       case "auto-mini-mode":
-        store({ ...settings, autoMiniMode: change.enabled });
+        save({ ...settings, autoMiniMode: change.enabled });
         break;
 
       case "mini-mode-opacity":
-        if (MINI_MODE_OPACITIES.includes(change.opacity)) {
-          store({ ...settings, miniModeOpacity: change.opacity });
+        if (isMiniModeOpacity(change.opacity)) {
+          save({ ...settings, miniModeOpacity: change.opacity });
         }
         break;
     }

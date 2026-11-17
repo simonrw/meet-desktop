@@ -10,13 +10,13 @@ export type JoinChannel = "join-prompt:join";
 export type CloseChannel = "join-prompt:close";
 
 /**
- * The join prompt's answer to an attempt to join: an error to show inline, or nothing once the meeting is opening.
+ * The Join Prompt's answer to an attempt to join: an error to show inline, or nothing once the meeting is opening.
  */
 export type JoinResult = { error: string } | undefined;
 
 export interface JoinPrompt {
   /**
-   * Opens the join prompt, or brings it to the front when it's already open.
+   * Opens the Join Prompt, or brings it to the front when it's already open.
    */
   open(): void;
 }
@@ -54,7 +54,7 @@ const JOIN_PROMPT_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!d
 </html>`)}`;
 
 /**
- * Sets up the join prompt, which takes a Meet link or meeting code and sends a join meeting Command to `onCommand`.
+ * Sets up the Join Prompt, which takes a Meet link or Meeting Code and sends a join meeting Command to `onCommand`.
  * A Meet link or code on the clipboard is prefilled when the prompt opens.
  */
 export function startJoinPrompt(onCommand: (command: Command) => void): JoinPrompt {

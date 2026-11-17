@@ -1,4 +1,4 @@
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { isRecord, readJsonFile, writeJsonFile } from "./json-file";
 
 export type HotkeyName =
   | "toggle-mute"
@@ -31,12 +31,15 @@ export interface Settings {
   /** Whether to enter Mini Mode when the user switches to another app during a call. */
   autoMiniMode: boolean;
 
-  /** The mini window's opacity, from `MIN_MINI_MODE_OPACITY` to 1. */
+  /** The mini window's opacity, one of `MINI_MODE_OPACITIES`. */
   miniModeOpacity: number;
 }
 
+/**
+ * The opacities the user can choose for the mini window.
+ */
 // Any fainter and the call can't be made out.
-export const MIN_MINI_MODE_OPACITY = 0.3;
+export const MINI_MODE_OPACITIES = [1, 0.9, 0.8, 0.7, 0.6, 0.5];
 
 export const DEFAULT_SETTINGS: Settings = {
   hotkeys: {
@@ -63,10 +66,8 @@ export const HOTKEY_NAMES = Object.keys(DEFAULT_SETTINGS.hotkeys) as HotkeyName[
  * Reads settings saved by `saveSettings`, falling back to the default for anything missing or malformed.
  */
 export function loadSettings(file: string): Settings {
-  let saved: unknown;
-  try {
-    saved = JSON.parse(readFileSync(file, "utf8"));
-  } catch {
+  const saved = readJsonFile(file);
+  if (saved === undefined) {
     return DEFAULT_SETTINGS;
   }
 
@@ -111,20 +112,13 @@ export function loadSettings(file: string): Settings {
   };
 }
 
-function isMiniModeOpacity(value: unknown): value is number {
-  return typeof value === "number" && value >= MIN_MINI_MODE_OPACITY && value <= 1;
+export function isMiniModeOpacity(value: unknown): value is number {
+  return typeof value === "number" && MINI_MODE_OPACITIES.includes(value);
 }
 
 /**
  * Persists settings so the next launch can load them.
  */
 export function saveSettings(file: string, settings: Settings): void {
-  // Renaming over the old file means a crash mid-write can't leave it half written.
-  const partial = `${file}.partial`;
-  writeFileSync(partial, JSON.stringify(settings, null, 2));
-  renameSync(partial, file);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  writeJsonFile(file, settings);
 }

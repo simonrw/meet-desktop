@@ -4,6 +4,8 @@ Electron can't add or remove a window's frame after the window is created, and r
 
 A frameless window can't be dragged by its content, and Meet's page isn't ours to add a drag region to. A thin handle page of our own sits over the top of the mini window instead. It moves the window as the user drags it and returns to Full on a double-click.
 
+Only the handle returns to Full on a double-click, not the whole mini window. Catching double-clicks on Meet's page would also catch ones meant for Meet, such as selecting a word in the chat or clicking a control twice in quick succession, and Meet's markup isn't ours to tell them apart reliably.
+
 ## Consequences
 
 - The Meeting Window is a `BaseWindow`, not a `BrowserWindow`, so `BrowserWindow.getAllWindows()` and `BrowserWindow.fromWebContents` don't find it. End-to-end tests reach it through `BaseWindow.getAllWindows()`, and screen sharing is handed the window to show the Source Picker over.

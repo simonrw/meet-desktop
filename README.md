@@ -37,7 +37,7 @@ The first time you join a call, macOS asks for camera and microphone access. All
 
 ### Joining a meeting
 
-Press Cmd+J (or File > Join Meeting…, or Join Meeting… in the menu bar menu) and enter a Meet link such as `https://meet.google.com/abc-defg-hij`, or just the code `abc-defg-hij`. Press Return to open the meeting's pre-join screen. If you copied a Meet link or code before opening the prompt, it's already filled in, so Return joins it straight away. Escape closes the prompt.
+Press Cmd+J (or File > Join Meeting…, or Join Meeting… in the menu bar menu) and enter a Meet link such as `https://meet.google.com/abc-defg-hij`, or just the code `abc-defg-hij`. Press Return to open the meeting's pre-join screen. A Meet link that picks one of your Google accounts (`?authuser=1`) opens the meeting under that account. If you copied a Meet link or code before opening the prompt, it's already filled in, so Return joins it straight away. Escape closes the prompt.
 
 To open a meeting from a script, Raycast or Alfred, open a URL in the app's own scheme:
 
@@ -73,7 +73,7 @@ The microphone icon in the menu bar shows where you are:
 - **Filled**: in a call.
 - **Crossed out**: in a call and muted.
 
-Click it for Mute, Turn Off Camera, Show Window, Leave Call…, Join Meeting…, Settings… and Quit Meet. Mute, camera and Leave Call are greyed out outside a call. Leave Call asks before hanging up, as the hotkey does. The menu works while the window is hidden.
+Click it for Mute, Turn Off Camera, Show Window, Toggle Mini Mode, Leave Call…, Join Meeting…, Settings… and Quit Meet. Mute, camera and Leave Call are greyed out outside a call. Leave Call asks before hanging up, as the hotkey does. The menu works while the window is hidden.
 
 ### Settings
 

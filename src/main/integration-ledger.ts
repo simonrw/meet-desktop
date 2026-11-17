@@ -1,6 +1,5 @@
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
-
-import type { IntegrationLedgerPort, LedgerEntries } from "./integration-lifecycle";
+import { isRecord, readJsonFile, writeJsonFile } from "./json-file";
+import type { IntegrationLedgerPort, LedgerEntries } from "./meeting-controller";
 
 /**
  * Keeps the Integration Ledger in a JSON file, treating a missing or unreadable file as an empty ledger.
@@ -8,19 +7,10 @@ import type { IntegrationLedgerPort, LedgerEntries } from "./integration-lifecyc
 export function fileLedger(file: string): IntegrationLedgerPort {
   return {
     read() {
-      try {
-        const saved: unknown = JSON.parse(readFileSync(file, "utf8"));
-        return typeof saved === "object" && saved !== null && !Array.isArray(saved) ? (saved as LedgerEntries) : {};
-      } catch {
-        return {};
-      }
+      const saved = readJsonFile(file);
+      return isRecord(saved) ? (saved as LedgerEntries) : {};
     },
 
-    write(entries) {
-      // Renaming over the old file means a crash mid-write can't leave it half written.
-      const partial = `${file}.partial`;
-      writeFileSync(partial, JSON.stringify(entries));
-      renameSync(partial, file);
-    },
+    write: (entries) => writeJsonFile(file, entries),
   };
 }

@@ -1,12 +1,9 @@
 import { isDeepStrictEqual } from "node:util";
 
-import {
-  startIntegrationLifecycle,
-  type Clock,
-  type Integration,
-  type IntegrationLedgerPort,
-} from "./integration-lifecycle";
 import type { MeetingLink } from "./meeting-link";
+
+// Long enough to leave one call and join the next without Integrations restoring and applying again in between.
+const BACK_TO_BACK_WINDOW_MS = 30_000;
 
 export type MeetingState =
   | { status: "idle" }
@@ -38,6 +35,54 @@ export type PlainCommand = {
 export type Command = PlainCommand | { type: "join-meeting"; link: MeetingLink };
 
 export type Presentation = "full" | "mini";
+
+/**
+ * State an Integration saves when it applies, kept in the Integration Ledger until it restores.
+ */
+export type RestoreState = string | number | boolean | null | RestoreState[] | { [key: string]: RestoreState };
+
+/**
+ * A system side effect tied to being in a call.
+ */
+export interface Integration {
+  /** Names the Integration in the Integration Ledger, so it must stay the same between releases. */
+  readonly id: string;
+
+  /** Names the Integration in status the user sees. */
+  readonly label: string;
+
+  readonly enabled: boolean;
+
+  /**
+   * Applies the side effect, resolving to the state `restore` needs to undo it.
+   */
+  apply(): Promise<RestoreState>;
+
+  /**
+   * Undoes the side effect. `saved` is `null` when the apply never finished, so the state to return to isn't known.
+   */
+  restore(saved: RestoreState): Promise<void>;
+}
+
+/**
+ * The applied Integrations, by id, with the state each needs to restore.
+ */
+export type LedgerEntries = Record<string, RestoreState>;
+
+/**
+ * Persists the Integration Ledger, so Integrations left applied by a crash can be restored on the next launch.
+ */
+export interface IntegrationLedgerPort {
+  read(): LedgerEntries;
+  write(entries: LedgerEntries): void;
+}
+
+export interface Clock {
+  /**
+   * Calls `callback` after `delayMs`, unless the returned function is called first.
+   */
+  schedule(delayMs: number, callback: () => void): () => void;
+}
 
 export interface MeetBridgePort {
   toggleMute(): void;
@@ -113,6 +158,10 @@ export interface MeetingController {
  * Creates the Meeting Controller, which owns the Meeting State: it takes in Meet Signals and Commands, acts on the Meet
  * page and the Meeting Window through their ports, and applies Integrations while the user is in a call.
  * `autoMiniMode` reads whether the user wants Mini Mode whenever they switch away from the app during a call.
+ *
+ * Each Integration applies and restores independently of the others, with the Integration Ledger kept up to date.
+ * Whatever the ledger lists is restored straight away, since leftover entries mean the last launch crashed during a
+ * call.
  */
 export function createMeetingController({
   meetBridge,
@@ -136,9 +185,80 @@ export function createMeetingController({
   let confirming = false;
   const listeners: Array<(state: MeetingState) => void> = [];
 
-  const integrationLifecycle = startIntegrationLifecycle({ integrations, ledger, clock });
+  const entries = { ...ledger.read() };
+  const integrationQueues = new Map<string, Promise<void>>();
+  const failures = new Map<string, string>();
+  const failureListeners: Array<(failures: string[]) => void> = [];
+  let integrationsApplied = false;
+  let cancelRestore: (() => void) | undefined;
 
   const state = (): MeetingState => (status === "in-call" ? { status, muted, cameraOn, handRaised } : { status });
+
+  /**
+   * Runs `step` after every step queued before it for the same Integration, so an apply and its restore never overlap.
+   */
+  function enqueue(integration: Integration, step: () => Promise<void>): void {
+    integrationQueues.set(integration.id, (integrationQueues.get(integration.id) ?? Promise.resolve()).then(step));
+  }
+
+  /**
+   * Runs one Integration's apply or restore, reporting how it went, without letting a failure reach the call.
+   */
+  async function attempt(integration: Integration, turned: "on" | "off", work: () => Promise<void>): Promise<void> {
+    const before = failures.get(integration.id);
+
+    try {
+      await work();
+      failures.delete(integration.id);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      failures.set(integration.id, `${integration.label} wasn't turned ${turned}: ${reason}`);
+    }
+
+    if (failures.get(integration.id) !== before) {
+      const current = [...failures.values()];
+      failureListeners.forEach((listener) => listener(current));
+    }
+  }
+
+  function applyIntegrations(): void {
+    integrationsApplied = true;
+
+    for (const integration of integrations.filter((integration) => integration.enabled)) {
+      enqueue(integration, () => {
+        // Listed before applying, since a crash or a failure part way through may still leave it applied.
+        entries[integration.id] ??= null;
+        ledger.write({ ...entries });
+
+        return attempt(integration, "on", async () => {
+          entries[integration.id] = await integration.apply();
+          ledger.write({ ...entries });
+        });
+      });
+    }
+  }
+
+  function restoreIntegrations(): void {
+    cancelRestore?.();
+    cancelRestore = undefined;
+    integrationsApplied = false;
+
+    for (const integration of integrations) {
+      enqueue(integration, async () => {
+        // Read once earlier steps have run, since an apply still running may change the entry when it finishes.
+        const saved = entries[integration.id];
+        if (saved === undefined) {
+          return;
+        }
+
+        await attempt(integration, "off", async () => {
+          await integration.restore(saved);
+          delete entries[integration.id];
+          ledger.write({ ...entries });
+        });
+      });
+    }
+  }
 
   /**
    * Puts a question to the user, resolving to whether they agreed. Resolves to false without asking while another
@@ -181,6 +301,8 @@ export function createMeetingController({
     }
   }
 
+  restoreIntegrations();
+
   return {
     get state() {
       return state();
@@ -191,11 +313,11 @@ export function createMeetingController({
     },
 
     get integrationFailures() {
-      return integrationLifecycle.failures;
+      return [...failures.values()];
     },
 
     onIntegrationFailuresChange(listener) {
-      integrationLifecycle.onFailuresChange(listener);
+      failureListeners.push(listener);
     },
 
     signal(signal) {
@@ -207,7 +329,13 @@ export function createMeetingController({
           break;
 
         case "entered-call":
-          integrationLifecycle.enteredCall();
+          cancelRestore?.();
+          cancelRestore = undefined;
+
+          if (!integrationsApplied) {
+            applyIntegrations();
+          }
+
           status = "in-call";
           break;
 
@@ -216,7 +344,10 @@ export function createMeetingController({
             meetingWindow.setPresentation("full");
           }
 
-          integrationLifecycle.leftCall();
+          if (integrationsApplied && cancelRestore === undefined) {
+            cancelRestore = clock.schedule(BACK_TO_BACK_WINDOW_MS, restoreIntegrations);
+          }
+
           status = "idle";
           muted = false;
           cameraOn = true;
@@ -295,8 +426,10 @@ export function createMeetingController({
       }
     },
 
-    quit() {
-      return integrationLifecycle.quit();
+    async quit() {
+      restoreIntegrations();
+
+      await Promise.all(integrationQueues.values());
     },
   };
 }

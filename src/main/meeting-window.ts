@@ -228,19 +228,22 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
       show();
     },
 
-    confirmLeave: () => confirmLeave(shown(), show, "Leave the call?", "Leave"),
-    confirmSwitch: (link) => confirmLeave(shown(), show, `Leave the call and join ${link.code}?`, "Leave and Join"),
+    confirmLeave: () => askToLeave(shown(), show, "Leave the call?", "Leave"),
+    confirmSwitch: (link) => askToLeave(shown(), show, `Leave the call and join ${link.code}?`, "Leave and Join"),
   };
 }
 
-async function confirmLeave(window: BaseWindow, show: () => void, message: string, leave: string): Promise<boolean> {
+/**
+ * Asks `message` in a sheet on the window, resolving to true if the user picks the `leaveButton` over Cancel.
+ */
+async function askToLeave(window: BaseWindow, show: () => void, message: string, leaveButton: string): Promise<boolean> {
   // The question is a sheet on the window, which may be hidden or behind another app.
   show();
 
   const { response } = await dialog.showMessageBox(window, {
     type: "question",
     message,
-    buttons: [leave, "Cancel"],
+    buttons: [leaveButton, "Cancel"],
 
     // Return must not hang up: the question can appear while the user is typing in another app.
     defaultId: 1,
