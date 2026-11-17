@@ -127,7 +127,12 @@ export function createMeetingWindow(meetOrigin: string, onCommand: (command: Com
 
   configureSession(meetSession, meetOrigin, shown);
   routeNavigation(meetView.webContents, meetOrigin, () => openingMeeting || quitting);
-  meetView.webContents.on("page-title-updated", (_event, title) => full.setTitle(title));
+  meetView.webContents.on("page-title-updated", (_event, title) => {
+    // The page outlives the window while quitting, and an uncaught error here shows a modal alert that stops the quit.
+    if (!full.isDestroyed()) {
+      full.setTitle(title);
+    }
+  });
 
   const saveFullBounds = rememberBounds(full, join(userData, "window-bounds.json"));
 
