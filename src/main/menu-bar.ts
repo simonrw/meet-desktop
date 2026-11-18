@@ -62,12 +62,6 @@ function buildMenu(controller: MeetingController, updates: Updates, openers: Win
   const { state, inCall } = controller;
   const send = (type: PlainCommand["type"]) => () => controller.command({ type });
 
-  // The menu is used while another app is active, and what it opens must come in front of that app's windows.
-  const inFront = (open: () => void) => () => {
-    app.focus({ steal: true });
-    open();
-  };
-
   const failureItems: MenuItemConstructorOptions[] = controller.integrationFailures.map((failure) => ({
     label: failure,
     enabled: false,
@@ -107,10 +101,10 @@ function buildMenu(controller: MeetingController, updates: Updates, openers: Win
     { id: "show-window", label: "Show Window", click: send("show-window") },
     { id: "toggle-mini-mode", label: "Toggle Mini Mode", click: send("toggle-mini-mode") },
     { id: "leave-call", label: "Leave Call…", enabled: inCall, click: send("leave-call") },
-    { id: "join-meeting", label: "Join Meeting…", click: inFront(openers.openJoinPrompt) },
+    { id: "join-meeting", label: "Join Meeting…", click: () => openers.openJoinPrompt() },
     { type: "separator" },
-    { id: "settings", label: "Settings…", click: inFront(openers.openSettings) },
-    { id: "check-for-updates", label: "Check for Updates…", click: inFront(() => void updates.checkForUpdates()) },
+    { id: "settings", label: "Settings…", click: () => openers.openSettings() },
+    { id: "check-for-updates", label: "Check for Updates…", click: () => void updates.checkForUpdates() },
     ...updateItems,
     { id: "quit", label: `Quit ${app.name}`, click: () => app.quit() },
   ]);

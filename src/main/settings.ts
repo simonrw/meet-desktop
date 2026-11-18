@@ -71,7 +71,8 @@ export interface SettingsWindow {
   onChange(listener: (settings: Settings) => void): void;
 
   /**
-   * Opens the settings window, or brings it to the front when it's already open.
+   * Opens the settings window, or brings it to the front when it's already open, taking the keyboard from whichever
+   * app is active.
    */
   open(): void;
 }
@@ -300,6 +301,9 @@ export function startSettings(
     },
 
     open() {
+      // Opened from the menu bar menu or the mini window while another app is active, and must take the keyboard.
+      app.focus({ steal: true });
+
       if (window) {
         window.focus();
         return;

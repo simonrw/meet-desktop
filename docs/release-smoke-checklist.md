@@ -78,6 +78,7 @@ The default Mini Mode hotkey is Control+Option+P.
 - [ ] Drag the mini window by the strip along its top edge: it follows the pointer smoothly. Resize it from an edge or corner.
 - [ ] Switch to Full and back: each comes back at its own size and position, also after quitting and relaunching.
 - [ ] With another app active, click into Meet's chat box in the mini window and type, then paste with Cmd+V: the text goes into Meet.
+- [ ] With another app active, click the mini window and press Cmd+J: the Join Prompt comes to the front and takes the keyboard.
 - [ ] After using Mini Mode, Meet is still in the Dock and in the Cmd+Tab app switcher, and Cmd+Tab to it shows the Meet menu.
 - [ ] With another app active, double-click the strip along the top of the mini window: the Full window comes back in front and takes the keyboard.
 - [ ] Enter Mini Mode during a call and leave with Meet's leave button: the Full window comes back.

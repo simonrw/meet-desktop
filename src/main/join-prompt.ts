@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { BrowserWindow, clipboard } from "electron";
+import { app, BrowserWindow, clipboard } from "electron";
 
 import type { Command } from "./meeting-controller";
 import { parseMeetingLink } from "./meeting-link";
@@ -16,7 +16,8 @@ export type JoinResult = { error: string } | undefined;
 
 export interface JoinPrompt {
   /**
-   * Opens the Join Prompt, or brings it to the front when it's already open.
+   * Opens the Join Prompt, or brings it to the front when it's already open, taking the keyboard from whichever app
+   * is active.
    */
   open(): void;
 }
@@ -74,6 +75,9 @@ export function startJoinPrompt(onCommand: (command: Command) => void): JoinProm
 
   return {
     open() {
+      // Opened from the menu bar menu or the mini window while another app is active, and must take the keyboard.
+      app.focus({ steal: true });
+
       if (window) {
         window.focus();
         return;
