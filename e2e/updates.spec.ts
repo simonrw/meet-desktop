@@ -150,18 +150,25 @@ test("without the override, the app never checks for Updates", async () => {
   expect(logs).not.toContain("Checking for Updates");
 });
 
-function checkForUpdates() {
-  return clickMenuItem(app, "app menu", "check-for-updates");
+function checkForUpdates(menu: "app menu" | "menu bar" = "app menu") {
+  return clickMenuItem(app, menu, "check-for-updates");
 }
 
-test("checking for Updates with nothing newer reports the running version is the latest", async () => {
-  await launch({ version: runningVersion });
-  const asked = answerNextQuestion(app);
+const MENUS = [
+  { menu: "app menu", name: "Meet menu" },
+  { menu: "menu bar", name: "menu bar menu" },
+] as const;
 
-  await checkForUpdates();
+for (const { menu, name } of MENUS) {
+  test(`checking for Updates from the ${name} with nothing newer reports the running version is the latest`, async () => {
+    await launch({ version: runningVersion });
+    const asked = answerNextQuestion(app);
 
-  expect(await asked).toEqual({ message: "You're on the latest version", detail: `Meet ${runningVersion}`, buttons: ["OK"] });
-});
+    await checkForUpdates(menu);
+
+    expect(await asked).toEqual({ message: "You're on the latest version", detail: `Meet ${runningVersion}`, buttons: ["OK"] });
+  });
+}
 
 test("checking for Updates finds a Release published since launch and offers to restart to update to it", async () => {
   await launch({ version: runningVersion });

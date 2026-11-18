@@ -16,7 +16,8 @@ export type JoinResult = { error: string } | undefined;
 
 export interface JoinPrompt {
   /**
-   * Opens the Join Prompt, or brings it to the front when it's already open.
+   * Opens the Join Prompt, or brings it to the front when it's already open, taking the keyboard from whichever app
+   * is active.
    */
   open(): void;
 }
@@ -74,7 +75,8 @@ export function startJoinPrompt(onCommand: (command: Command) => void): JoinProm
 
   return {
     open() {
-      // The menu bar item is clicked while another app is active, and the prompt must take the keyboard.
+      // Opened from the menu bar menu, or by its shortcut from the mini window, while another app is active, and must
+      // take the keyboard.
       app.focus({ steal: true });
 
       if (window) {

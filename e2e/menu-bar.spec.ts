@@ -62,15 +62,26 @@ test("the icon follows the Meet page into a call, through mute and unmute, and o
 });
 
 test("call-only items are enabled only during a call", async () => {
-  await expect.poll(enabledItems).toEqual(["show-window", "toggle-mini-mode", "join-meeting", "settings", "quit"]);
+  const always = ["show-window", "toggle-mini-mode", "join-meeting", "settings", "check-for-updates", "quit"];
+  await expect.poll(enabledItems).toEqual(always);
 
   await joinCall();
   await expect
     .poll(enabledItems)
-    .toEqual(["toggle-mute", "toggle-camera", "show-window", "toggle-mini-mode", "leave-call", "join-meeting", "settings", "quit"]);
+    .toEqual([
+      "toggle-mute",
+      "toggle-camera",
+      "show-window",
+      "toggle-mini-mode",
+      "leave-call",
+      "join-meeting",
+      "settings",
+      "check-for-updates",
+      "quit",
+    ]);
 
   await page.getByRole("button", { name: "Leave call" }).click();
-  await expect.poll(enabledItems).toEqual(["show-window", "toggle-mini-mode", "join-meeting", "settings", "quit"]);
+  await expect.poll(enabledItems).toEqual(always);
 });
 
 test("the mute item mutes Meet and the icon shows it", async () => {

@@ -19,8 +19,8 @@ export interface Updates {
   onStateChange(listener: (state: UpdateState) => void): void;
 
   /**
-   * Looks for a newer Release now and shows a dialog with what it found, offering to restart to update when one is
-   * ready and there's no call.
+   * Brings the app forward, looks for a newer Release and shows a dialog with what it found, offering to restart to
+   * update when one is ready and there's no call.
    */
   checkForUpdates(): Promise<void>;
 
@@ -96,6 +96,9 @@ export function startUpdates(
     },
 
     async checkForUpdates() {
+      // Checking from the menu bar menu leaves another app active, which would keep the dialog behind its windows.
+      app.focus({ steal: true });
+
       let found: string | undefined;
 
       try {
@@ -110,7 +113,10 @@ export function startUpdates(
       }
 
       if (found !== undefined && !isReady(found)) {
-        await tell(`Downloading ${app.name} ${found}`, '"Restart to Update" appears in the menu bar once it has downloaded.');
+        await tell(
+          `Downloading ${app.name} ${found}`,
+          '"Restart to Update" appears in the menu bar menu once it has downloaded.',
+        );
       } else if (state.status !== "ready") {
         await tell("You're on the latest version", `${app.name} ${app.getVersion()}`);
       } else if (controller.inCall) {
