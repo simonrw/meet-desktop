@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { app, BrowserWindow, clipboard } from "electron";
+import { BrowserWindow, clipboard } from "electron";
 
 import type { Command } from "./meeting-controller";
 import { parseMeetingLink } from "./meeting-link";
@@ -74,9 +74,6 @@ export function startJoinPrompt(onCommand: (command: Command) => void): JoinProm
 
   return {
     open() {
-      // The menu bar item is clicked while another app is active, and the prompt must take the keyboard.
-      app.focus({ steal: true });
-
       if (window) {
         window.focus();
         return;

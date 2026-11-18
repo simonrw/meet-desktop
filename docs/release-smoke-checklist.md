@@ -65,7 +65,7 @@ The default leave hotkey is Control+Option+L.
 - [ ] Join a call: the icon fills in. Mute with Meet's own button, then with the hotkey, then from the menu: the icon is crossed out while muted and filled while unmuted.
 - [ ] Close the Meeting Window, then use Turn Off Camera and Show Window from the menu: the camera toggles in Meet and the window comes back.
 - [ ] Choose Leave Call… from the menu: the window comes forward asking "Leave the call?". Choose Leave: the icon goes back to outlined.
-- [ ] Settings… opens the settings window, and Quit Meet quits the app.
+- [ ] Focus another app and choose Settings…: the settings window comes to the front and takes the keyboard. Quit Meet quits the app.
 - [ ] Focus another app and choose Check for Updates…: the result comes up in front of that app.
 
 ## Mini Mode
