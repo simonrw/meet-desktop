@@ -276,14 +276,13 @@ function createMiniWindow(boundsFile: string, opacity: number, onDoubleClick: ()
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
+    // Joins every Space, including full-screen apps' Spaces. setVisibleOnAllWorkspaces would also do so, but by
+    // default turns the whole app into a background app with no Dock icon, app switcher entry or menus.
     type: "panel",
   });
 
   window.setOpacity(opacity);
   window.setAlwaysOnTop(true, "floating");
-
-  // By default this turns the whole app into a background app, with no Dock icon, app switcher entry or menus.
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
 
   const handle = new WebContentsView({
     webPreferences: { sandbox: true, contextIsolation: true, preload: HANDLE_PRELOAD },
