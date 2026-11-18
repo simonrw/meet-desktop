@@ -132,6 +132,12 @@ test("the menu bar item switches between Full and a frameless mini window floati
   await toggleMiniMode(FULL);
 });
 
+test("the app keeps its Dock icon, app switcher entry and menus after entering Mini Mode", async () => {
+  await toggleMiniMode(MINI);
+
+  expect(await app.evaluate(({ app }) => app.dock?.isVisible())).toBe(true);
+});
+
 test("the Meet page carries on in Mini Mode without reloading", async () => {
   await joinCall();
 

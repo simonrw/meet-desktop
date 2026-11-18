@@ -12,7 +12,8 @@ export interface MenuBar {
 
 /**
  * Puts the menu bar item in place: its icon shows the Meeting State, and its menu shows Integration failures, sends
- * Commands to the Meeting Controller, opens the Join Prompt and settings, and restarts to install a downloaded Update.
+ * Commands to the Meeting Controller, opens the Join Prompt and settings, checks for Updates, and restarts to install a
+ * downloaded Update.
  */
 export function startMenuBar(controller: MeetingController, updates: Updates, openers: WindowOpeners): MenuBar {
   const menuFor = () => buildMenu(controller, updates, openers);
@@ -103,6 +104,7 @@ function buildMenu(controller: MeetingController, updates: Updates, openers: Win
     { id: "join-meeting", label: "Join Meeting…", click: () => openers.openJoinPrompt() },
     { type: "separator" },
     { id: "settings", label: "Settings…", click: () => openers.openSettings() },
+    { id: "check-for-updates", label: "Check for Updates…", click: () => void updates.checkForUpdates() },
     ...updateItems,
     { id: "quit", label: `Quit ${app.name}`, click: () => app.quit() },
   ]);
