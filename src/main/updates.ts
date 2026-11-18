@@ -96,8 +96,7 @@ export function startUpdates(
     },
 
     async checkForUpdates() {
-      // Chosen from the menu bar menu or the mini window while another app is active, which would keep the dialog
-      // behind its windows.
+      // Checking from the menu bar menu leaves another app active, which would keep the dialog behind its windows.
       app.focus({ steal: true });
 
       let found: string | undefined;

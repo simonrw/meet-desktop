@@ -75,7 +75,8 @@ export function startJoinPrompt(onCommand: (command: Command) => void): JoinProm
 
   return {
     open() {
-      // Opened from the menu bar menu or the mini window while another app is active, and must take the keyboard.
+      // Opened from the menu bar menu, or by its shortcut from the mini window, while another app is active, and must
+      // take the keyboard.
       app.focus({ steal: true });
 
       if (window) {
