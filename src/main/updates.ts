@@ -1,4 +1,4 @@
-import { app, dialog, type MessageBoxOptions } from "electron";
+import { app, dialog } from "electron";
 import { autoUpdater } from "electron-updater";
 
 import type { MeetingController } from "./meeting-controller";
@@ -96,6 +96,9 @@ export function startUpdates(
     },
 
     async checkForUpdates() {
+      // Checking from the menu bar menu leaves another app active, which would keep the dialog behind its windows.
+      app.focus({ steal: true });
+
       let found: string | undefined;
 
       try {
@@ -110,13 +113,16 @@ export function startUpdates(
       }
 
       if (found !== undefined && !isReady(found)) {
-        await tell(`Downloading ${app.name} ${found}`, '"Restart to Update" appears in the menu bar once it has downloaded.');
+        await tell(
+          `Downloading ${app.name} ${found}`,
+          '"Restart to Update" appears in the menu bar menu once it has downloaded.',
+        );
       } else if (state.status !== "ready") {
         await tell("You're on the latest version", `${app.name} ${app.getVersion()}`);
       } else if (controller.inCall) {
         await tell(`${app.name} ${state.version} is ready to install`, "You can restart to update once you leave the call.");
       } else {
-        const response = await ask({
+        const { response } = await dialog.showMessageBox({
           message: `${app.name} ${state.version} is ready to install`,
           detail: "Restart now to install it?",
           buttons: ["Restart", "Later"],
@@ -149,18 +155,7 @@ export function startUpdates(
  * Shows `message` with `detail` in a dialog with an OK button.
  */
 async function tell(message: string, detail: string): Promise<void> {
-  await ask({ message, detail, buttons: ["OK"] });
-}
-
-/**
- * Brings the app forward and shows a message box, resolving to the index of the button the user chose.
- */
-async function ask(options: MessageBoxOptions): Promise<number> {
-  // Checking from the menu bar menu leaves another app active, which would keep the dialog behind its windows.
-  app.focus({ steal: true });
-
-  const { response } = await dialog.showMessageBox(options);
-  return response;
+  await dialog.showMessageBox({ message, detail, buttons: ["OK"] });
 }
 
 /**
