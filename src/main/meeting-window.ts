@@ -276,9 +276,10 @@ function createMiniWindow(boundsFile: string, opacity: number, onDoubleClick: ()
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    // Joins every Space, including full-screen apps' Spaces. setVisibleOnAllWorkspaces would also do so, but by
-    // default turns the whole app into a background app with no Dock icon, app switcher entry or menus. Clicking the
-    // panel doesn't make Meet the active app, so the app the user is working in keeps its menus.
+    // Joins every Space, including full-screen apps' Spaces. setVisibleOnAllWorkspaces would also do so, but Electron
+    // makes that work over full-screen apps by turning the whole app into a background app with no Dock icon, app
+    // switcher entry or menus. Clicking the panel doesn't make Meet the active app, so the app the user is working in
+    // keeps its menus.
     type: "panel",
   });
 

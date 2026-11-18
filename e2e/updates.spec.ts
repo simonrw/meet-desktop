@@ -154,8 +154,13 @@ function checkForUpdates(menu: "app menu" | "menu bar" = "app menu") {
   return clickMenuItem(app, menu, "check-for-updates");
 }
 
-for (const menu of ["app menu", "menu bar"] as const) {
-  test(`checking for Updates from the ${menu} with nothing newer reports the running version is the latest`, async () => {
+const MENUS = [
+  { menu: "app menu", name: "Meet menu" },
+  { menu: "menu bar", name: "menu bar menu" },
+] as const;
+
+for (const { menu, name } of MENUS) {
+  test(`checking for Updates from the ${name} with nothing newer reports the running version is the latest`, async () => {
     await launch({ version: runningVersion });
     const asked = answerNextQuestion(app);
 
