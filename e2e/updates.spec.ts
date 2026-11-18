@@ -154,23 +154,16 @@ function checkForUpdates(menu: "app menu" | "menu bar" = "app menu") {
   return clickMenuItem(app, menu, "check-for-updates");
 }
 
-test("checking for Updates with nothing newer reports the running version is the latest", async () => {
-  await launch({ version: runningVersion });
-  const asked = answerNextQuestion(app);
+for (const menu of ["app menu", "menu bar"] as const) {
+  test(`checking for Updates from the ${menu} with nothing newer reports the running version is the latest`, async () => {
+    await launch({ version: runningVersion });
+    const asked = answerNextQuestion(app);
 
-  await checkForUpdates();
+    await checkForUpdates(menu);
 
-  expect(await asked).toEqual({ message: "You're on the latest version", detail: `Meet ${runningVersion}`, buttons: ["OK"] });
-});
-
-test("the menu bar menu can check for Updates too", async () => {
-  await launch({ version: runningVersion });
-  const asked = answerNextQuestion(app);
-
-  await checkForUpdates("menu bar");
-
-  expect(await asked).toEqual({ message: "You're on the latest version", detail: `Meet ${runningVersion}`, buttons: ["OK"] });
-});
+    expect(await asked).toEqual({ message: "You're on the latest version", detail: `Meet ${runningVersion}`, buttons: ["OK"] });
+  });
+}
 
 test("checking for Updates finds a Release published since launch and offers to restart to update to it", async () => {
   await launch({ version: runningVersion });

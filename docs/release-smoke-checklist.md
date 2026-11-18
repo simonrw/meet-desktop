@@ -66,6 +66,7 @@ The default leave hotkey is Control+Option+L.
 - [ ] Close the Meeting Window, then use Turn Off Camera and Show Window from the menu: the camera toggles in Meet and the window comes back.
 - [ ] Choose Leave Call… from the menu: the window comes forward asking "Leave the call?". Choose Leave: the icon goes back to outlined.
 - [ ] Settings… opens the settings window, and Quit Meet quits the app.
+- [ ] Focus another app and choose Check for Updates…: the result comes up in front of that app.
 
 ## Mini Mode
 
@@ -76,7 +77,9 @@ The default Mini Mode hotkey is Control+Option+P.
 - [ ] In Mini Mode, click another app's window: the mini window stays on top. Switch to another Space and to a full-screen app: the mini window is there too.
 - [ ] Drag the mini window by the strip along its top edge: it follows the pointer smoothly. Resize it from an edge or corner.
 - [ ] Switch to Full and back: each comes back at its own size and position, also after quitting and relaunching.
-- [ ] Double-click the strip along the top of the mini window: the Full window comes back.
+- [ ] With another app active, click into Meet's chat box in the mini window and type, then paste with Cmd+V: the text goes into Meet.
+- [ ] After using Mini Mode, Meet is still in the Dock and in the Cmd+Tab app switcher, and Cmd+Tab to it shows the Meet menu.
+- [ ] With another app active, double-click the strip along the top of the mini window: the Full window comes back in front and takes the keyboard.
 - [ ] Enter Mini Mode during a call and leave with Meet's leave button: the Full window comes back.
 - [ ] Turn on "Enter Mini Mode when I switch to another app during a call". In a call, Cmd+Tab to another app: the mini window appears. Outside a call, Cmd+Tab away: the Full window stays as it is.
 - [ ] Set "Mini Mode opacity" to 70%: the mini window is see-through, and the Full window is not.
