@@ -277,7 +277,8 @@ function createMiniWindow(boundsFile: string, opacity: number, onDoubleClick: ()
     maximizable: false,
     fullscreenable: false,
     // Joins every Space, including full-screen apps' Spaces. setVisibleOnAllWorkspaces would also do so, but by
-    // default turns the whole app into a background app with no Dock icon, app switcher entry or menus.
+    // default turns the whole app into a background app with no Dock icon, app switcher entry or menus. Clicking a
+    // panel doesn't make Meet the active app, so the app the user is working in keeps its menus.
     type: "panel",
   });
 
