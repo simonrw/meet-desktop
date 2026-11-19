@@ -39,7 +39,8 @@ function designatedRequirement(path: string): string {
   return execFileSync("codesign", ["--display", "--requirements", "-", path], { encoding: "utf8", stdio: "pipe" });
 }
 
-describe("sign", () => {
+// CI runs this file on its macOS job, since codesign only exists on macOS.
+describe.runIf(process.platform === "darwin")("sign", () => {
   test("signs a local build ad-hoc so it still runs", async () => {
     vi.stubEnv("CI", "");
 
